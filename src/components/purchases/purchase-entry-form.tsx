@@ -46,7 +46,7 @@ interface ReceiptData {
   totalExpenses: number;
 }
 
-const SHOP_NAME = 'Al-Barakah Commission Shop';
+const SHOP_NAME = 'M-Shafiq Commission Shop';
 const SHOP_TAGLINE = 'Crop Commission Agent — Grain & Commodity Trade';
 
 export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntryFormProps) {

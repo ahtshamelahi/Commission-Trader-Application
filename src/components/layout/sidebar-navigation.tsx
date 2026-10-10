@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -13,7 +13,9 @@ import {
   Users,
   BarChart3,
   Store,
+  LogOut,
 } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -28,6 +30,17 @@ const navItems = [
 
 export function SidebarNavigation() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)!
+    );
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
 
   return (
     <aside className="hidden md:flex flex-col w-56 bg-slate-900 text-slate-300 border-r border-slate-800 h-screen sticky top-0 overflow-y-auto">
@@ -64,8 +77,15 @@ export function SidebarNavigation() {
         })}
       </nav>
 
-      {/* Footer info */}
+      {/* Footer info & Logout */}
       <div className="p-3 border-t border-slate-800 text-xs text-slate-500 text-center">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-3 rounded-md text-sm font-medium text-rose-400 hover:text-white hover:bg-rose-600 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Logout</span>
+        </button>
         <p>Commission Shop Management</p>
         <p className="text-[10px] text-slate-600 mt-0.5">PKR / 40kg Maund Standard</p>
       </div>

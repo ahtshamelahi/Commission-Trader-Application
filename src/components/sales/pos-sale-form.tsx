@@ -49,7 +49,7 @@ interface ReceiptData {
   totalSaleAmount: number;
 }
 
-const SHOP_NAME = 'Al-Barakah Commission Shop';
+const SHOP_NAME = 'M-Shafiq Commission Shop';
 const SHOP_TAGLINE = 'Crop Commission Agent — Grain & Commodity Trade';
 
 export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProps) {

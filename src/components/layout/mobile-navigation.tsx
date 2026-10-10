@@ -37,7 +37,7 @@ export function MobileNavigation() {
           <div className="flex items-center justify-center w-8 h-8 rounded bg-emerald-600 font-bold">
             <Store className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-sm tracking-tight">Al-Barakah Commission</span>
+          <span className="font-bold text-sm tracking-tight">M-Shafiq Commission Shop</span>
         </div>
 
         <button
@@ -60,11 +60,10 @@ export function MobileNavigation() {
                 key={item.name}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${isActive
                     ? 'bg-emerald-700 text-white'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon className="w-5 h-5" />
                 <span>{item.name}</span>

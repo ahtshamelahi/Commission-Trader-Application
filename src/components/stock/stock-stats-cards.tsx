@@ -130,9 +130,9 @@ export function StockStatsCards({ crops, varieties, purchases, sales }: StockSta
           <p className="text-sm font-semibold text-slate-500">No stock data found for these filters.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
           {filteredSummaries.map((s) => (
-            <div key={s.id} className="bg-white border border-slate-200 rounded-sm p-3 shadow-2xs hover:border-slate-300 transition-all flex flex-col relative overflow-hidden">
+            <div key={s.id} className="bg-white border border-slate-200 rounded-sm p-2 sm:p-3 shadow-2xs hover:border-slate-300 transition-all flex flex-col relative overflow-hidden">
               {s.currentStockKg <= 0 && (
                 <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none">
                   <div className="absolute transform rotate-45 bg-rose-500 text-white text-[9px] font-bold py-0.5 right-[-20px] top-[15px] w-[80px] text-center">
@@ -141,19 +141,19 @@ export function StockStatsCards({ crops, varieties, purchases, sales }: StockSta
                 </div>
               )}
 
-              <div className="mb-3 pr-6">
-                <h3 className="font-bold text-slate-900 leading-tight">{s.crop_name}</h3>
-                <p className="text-[10px] text-blue-700 font-semibold">{s.variety_name}</p>
+              <div className="mb-1 sm:mb-3 pr-4 sm:pr-6">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">{s.crop_name}</h3>
+                <p className="text-[9px] sm:text-[10px] text-blue-700 font-semibold">{s.variety_name}</p>
               </div>
 
               <div className="flex-1 flex flex-col justify-end space-y-3">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Available Stock</p>
-                  <div className="flex items-baseline gap-1.5 mt-2">
-                    <span className={`text-lg font-bold tracking-tight ${s.currentStockKg > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 sm:mb-1">Available Stock</p>
+                  <div className="flex items-baseline gap-1 sm:gap-1.5 mt-1 sm:mt-2">
+                    <span className={`text-sm sm:text-lg font-bold tracking-tight ${s.currentStockKg > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                       {s.currentStockKg.toLocaleString()}
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-500">kg</span>
+                    <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">kg</span>
                   </div>
                 </div>
 

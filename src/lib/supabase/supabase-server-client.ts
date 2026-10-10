@@ -9,3 +9,6 @@ export function getSupabaseServerClient() {
 
   return createClient(supabaseUrl, supabaseKey);
 }
+
+
+

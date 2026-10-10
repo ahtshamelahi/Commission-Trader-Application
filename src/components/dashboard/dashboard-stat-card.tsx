@@ -42,15 +42,15 @@ export function DashboardStatCard({
   }
 
   return (
-    <div className="p-3 bg-white border border-slate-200 rounded-sm shadow-2xs transition-all hover:border-slate-300">
+    <div className="p-2 sm:p-3 bg-white border border-slate-200 rounded-sm shadow-2xs transition-all hover:border-slate-300">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{title}</span>
+        <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider">{title}</span>
       </div>
-      <div className="mt-2 flex items-baseline gap-1.5">
-        <span className={`text-lg font-bold tracking-tight ${valueClass}`}>{value}</span>
-        {unit && <span className="text-[10px] font-semibold text-slate-500">{unit}</span>}
+      <div className="mt-1 sm:mt-2 flex items-baseline gap-1.5">
+        <span className={`text-sm sm:text-lg font-bold tracking-tight ${valueClass}`}>{value}</span>
+        {unit && <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">{unit}</span>}
       </div>
-      {trend && <p className="mt-0.5 text-[10px] text-slate-400">{trend}</p>}
+      {trend && <p className="mt-0.5 text-[9px] sm:text-[10px] text-slate-400">{trend}</p>}
     </div>
   );
 }

@@ -33,21 +33,21 @@ export default async function ExpensesPage() {
 
       <div className="mt-4 space-y-4">
         {/* Metric Cards Banner */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-3 bg-white border border-slate-200 rounded-sm flex items-center justify-between shadow-2xs">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
+          <div className="p-2 sm:p-3 bg-white border border-slate-200 rounded-sm flex flex-col justify-center shadow-2xs">
             <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Today's Expenses</p>
-              <h3 className="text-lg font-bold tracking-tight text-rose-600">Rs. {totalTodayPkr.toLocaleString()}</h3>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 sm:mb-1">Today's Expenses</p>
+              <h3 className="text-sm sm:text-lg font-bold tracking-tight text-rose-600">Rs. {totalTodayPkr.toLocaleString()}</h3>
             </div>
-            <span className="text-[10px] font-medium text-slate-400">{todayExpenses.length} entry(s)</span>
+            <span className="text-[9px] sm:text-[10px] font-medium text-slate-400 mt-0.5">{todayExpenses.length} entry(s)</span>
           </div>
 
-          <div className="p-3 bg-white border border-slate-200 rounded-sm flex items-center justify-between shadow-2xs">
+          <div className="p-2 sm:p-3 bg-white border border-slate-200 rounded-sm flex flex-col justify-center shadow-2xs">
             <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total Overall Expenses</p>
-              <h3 className="text-lg font-bold tracking-tight text-slate-900">Rs. {totalAllTimePkr.toLocaleString()}</h3>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 sm:mb-1">Overall Expenses</p>
+              <h3 className="text-sm sm:text-lg font-bold tracking-tight text-slate-900">Rs. {totalAllTimePkr.toLocaleString()}</h3>
             </div>
-            <span className="text-[10px] font-medium text-slate-400">{expenses.length} entry(s)</span>
+            <span className="text-[9px] sm:text-[10px] font-medium text-slate-400 mt-0.5">{expenses.length} entry(s)</span>
           </div>
         </div>
 
