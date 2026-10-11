@@ -16,15 +16,15 @@ async function StockPageData() {
   const [cropsRes, varietiesRes, purchasesRes, salesRes, movementsRes] = await Promise.all([
     supabase.from('crops').select('*').order('name', { ascending: true }),
     supabase.from('crop_varieties').select('*').order('name', { ascending: true }),
-    supabase.from('purchases').select('*'),
-    supabase.from('sales').select('*'),
-    supabase.from('stock_movements').select('*, crops(name)').order('created_at', { ascending: false }),
+    supabase.from('purchases').select('crop_id, variety_id, gross_weight_kg, crop_amount'),
+    supabase.from('sales').select('crop_id, variety_id, physical_weight_kg'),
+    supabase.from('stock_movements').select('*, crops(name)').order('created_at', { ascending: false }).limit(100),
   ]);
 
   const crops: Crop[] = cropsRes.data || [];
   const varieties: CropVariety[] = varietiesRes.data || [];
-  const purchases: Purchase[] = purchasesRes.data || [];
-  const sales: Sale[] = salesRes.data || [];
+  const purchases: Purchase[] = (purchasesRes.data as any) || [];
+  const sales: Sale[] = (salesRes.data as any) || [];
   const movements: StockMovement[] = movementsRes.data || [];
 
   return (

@@ -18,11 +18,11 @@ async function PurchasesData() {
     supabase.from('crops').select('*').order('name', { ascending: true }),
     supabase.from('crop_varieties').select('*').order('name', { ascending: true }),
     supabase.from('parties').select('*').or('party_type.eq.supplier,party_type.eq.both').order('name', { ascending: true }),
-    supabase.from('purchases').select('*, crops(name), parties(name)').order('created_at', { ascending: false }),
+    supabase.from('purchases').select('*, crops(name), parties(name)').order('created_at', { ascending: false }).limit(100),
   ]);
 
-  const varieties: CropVariety[] = varietiesRes.data || [];
-  const crops: Crop[] = (cropsRes.data || []).map((c) => ({
+  const varieties: CropVariety[] = (varietiesRes.data as any) || [];
+  const crops: Crop[] = ((cropsRes.data as any[]) || []).map((c) => ({
     ...c,
     varieties: varieties.filter((v) => v.crop_id === c.id),
   }));

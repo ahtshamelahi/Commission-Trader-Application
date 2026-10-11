@@ -17,8 +17,8 @@ async function SaleFormData() {
     supabase.from('sales').select('crop_id, variety_id, physical_weight_kg'),
   ]);
 
-  const varieties: CropVariety[] = varietiesRes.data || [];
-  const crops: Crop[] = (cropsRes.data || []).map((c) => ({
+  const varieties: CropVariety[] = (varietiesRes.data as any) || [];
+  const crops: Crop[] = ((cropsRes.data as any[]) || []).map((c) => ({
     ...c,
     varieties: varieties.filter((v) => v.crop_id === c.id),
   }));

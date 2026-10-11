@@ -4,7 +4,7 @@ import { DashboardStatCard } from '@/components/dashboard/dashboard-stat-card';
 import { RecentTransactionsTable, RecentTransactionItem } from '@/components/dashboard/recent-transactions-table';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { calculateProfitAndLoss } from '@/lib/calculations/profit-loss-calculation';
-import { calculateAvailableStock } from '@/lib/calculations/current-stock-calculation';
+
 
 export const dynamic = 'force-dynamic';
 
@@ -14,46 +14,63 @@ async function DashboardData() {
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
+  const todayIso = todayStart.toISOString();
 
-  const [purchasesRes, salesRes, expensesRes, stockRes] = await Promise.all([
-    supabase.from('purchases').select('*, crops(name), parties(name)').order('created_at', { ascending: false }),
-    supabase.from('sales').select('*, crops(name), parties(name)').order('created_at', { ascending: false }),
-    supabase.from('expenses').select('*').order('created_at', { ascending: false }),
-    supabase.from('stock_movements').select('quantity_kg'),
+  // Parallel: today-only rows for daily totals + limited recent rows for the activity list
+  // + all-time lightweight rows for P&L (only the numeric columns needed)
+  const [
+    todayPurchasesRes,
+    todaySalesRes,
+    todayExpensesRes,
+    recentPurchasesRes,
+    recentSalesRes,
+    allPurchasesPnlRes,
+    allSalesPnlRes,
+    allExpensesPnlRes,
+  ] = await Promise.all([
+    // Today totals — small result sets
+    supabase.from('purchases').select('crop_amount').gte('created_at', todayIso),
+    supabase.from('sales').select('sale_amount').gte('created_at', todayIso),
+    supabase.from('expenses').select('amount').gte('created_at', todayIso),
+    // Recent activity list — limit to 10 newest per type
+    supabase.from('purchases').select('id, invoice_no, crop_amount, net_weight_kg, created_at, crops(name), parties(name)').order('created_at', { ascending: false }).limit(10),
+    supabase.from('sales').select('id, invoice_no, sale_amount, physical_weight_kg, created_at, crops(name), parties(name)').order('created_at', { ascending: false }).limit(10),
+    // P&L — only the columns the calculation functions actually read
+    supabase.from('purchases').select('crop_id, net_weight_kg, crop_amount'),
+    supabase.from('sales').select('crop_id, physical_weight_kg, sale_amount'),
+    supabase.from('expenses').select('amount'),
   ]);
 
-  const purchases = purchasesRes.data || [];
-  const sales = salesRes.data || [];
-  const expenses = expensesRes.data || [];
-  const stockMovements = stockRes.data || [];
+  const todayPurchasesPkr = (todayPurchasesRes.data || []).reduce((acc, p) => acc + Number(p.crop_amount), 0);
+  const todaySalesPkr = (todaySalesRes.data || []).reduce((acc, s) => acc + Number(s.sale_amount), 0);
+  const todayExpensesPkr = (todayExpensesRes.data || []).reduce((acc, e) => acc + Number(e.amount), 0);
 
-  const todayPurchases = purchases.filter((p) => new Date(p.created_at) >= todayStart);
-  const todaySales = sales.filter((s) => new Date(s.created_at) >= todayStart);
-  const todayExpenses = expenses.filter((e) => new Date(e.created_at) >= todayStart);
+  const pnl = calculateProfitAndLoss(
+    (allSalesPnlRes.data as any) || [],
+    (allPurchasesPnlRes.data as any) || [],
+    (allExpensesPnlRes.data as any) || []
+  );
 
-  const todayPurchasesPkr = todayPurchases.reduce((acc, p) => acc + Number(p.crop_amount), 0);
-  const todaySalesPkr = todaySales.reduce((acc, s) => acc + Number(s.sale_amount), 0);
-  const todayExpensesPkr = todayExpenses.reduce((acc, e) => acc + Number(e.amount), 0);
+  const todayPurchaseCount = todayPurchasesRes.data?.length ?? 0;
+  const todaySaleCount = todaySalesRes.data?.length ?? 0;
 
-  const pnl = calculateProfitAndLoss(sales, purchases, expenses);
-
-  const recentPurchases: RecentTransactionItem[] = purchases.slice(0, 5).map((p) => ({
+  const recentPurchases: RecentTransactionItem[] = ((recentPurchasesRes.data as any[]) || []).map((p) => ({
     id: `pur-${p.id}`,
     type: 'purchase',
     invoice_no: p.invoice_no,
-    party_name: p.parties?.name || 'Supplier',
-    crop_name: p.crops?.name || 'Crop',
+    party_name: (p.parties as any)?.name || 'Supplier',
+    crop_name: (p.crops as any)?.name || 'Crop',
     amount: Number(p.crop_amount),
     weight_kg: Number(p.net_weight_kg),
     date: p.created_at,
   }));
 
-  const recentSales: RecentTransactionItem[] = sales.slice(0, 5).map((s) => ({
+  const recentSales: RecentTransactionItem[] = ((recentSalesRes.data as any[]) || []).map((s) => ({
     id: `sale-${s.id}`,
     type: 'sale',
     invoice_no: s.invoice_no,
-    party_name: s.parties?.name || 'Buyer',
-    crop_name: s.crops?.name || 'Crop',
+    party_name: (s.parties as any)?.name || 'Buyer',
+    crop_name: (s.crops as any)?.name || 'Crop',
     amount: Number(s.sale_amount),
     weight_kg: Number(s.physical_weight_kg),
     date: s.created_at,
@@ -70,14 +87,14 @@ async function DashboardData() {
           title="Today Purchases"
           value={`Rs. ${todayPurchasesPkr.toLocaleString()}`}
           iconName="shopping-cart"
-          trend={`${todayPurchases.length} invoice(s)`}
+          trend={`${todayPurchaseCount} invoice(s)`}
         />
         <DashboardStatCard
           title="Today Sales"
           value={`Rs. ${todaySalesPkr.toLocaleString()}`}
           iconName="trending-up"
           variant="positive"
-          trend={`${todaySales.length} invoice(s)`}
+          trend={`${todaySaleCount} invoice(s)`}
         />
         <DashboardStatCard
           title="Today Expenses"
