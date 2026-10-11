@@ -294,11 +294,10 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
         <button
           type="button"
           onClick={() => setMobileTab('items')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition ${
-            mobileTab === 'items'
-              ? 'bg-blue-700 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition ${mobileTab === 'items'
+            ? 'bg-blue-700 text-white shadow-xs'
+            : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
           <Sprout className="w-3.5 h-3.5" />
           <span>1. Select Crop & Enter ({crops.length} crops)</span>
@@ -306,18 +305,16 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
         <button
           type="button"
           onClick={() => setMobileTab('cart')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition relative ${
-            mobileTab === 'cart'
-              ? 'bg-blue-700 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition relative ${mobileTab === 'cart'
+            ? 'bg-blue-700 text-white shadow-xs'
+            : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
           <ShoppingCart className="w-3.5 h-3.5" />
           <span>2. Cart & Finalize</span>
           {cart.length > 0 && (
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1 ${
-              mobileTab === 'cart' ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
-            }`}>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1 ${mobileTab === 'cart' ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
+              }`}>
               {cart.length}
             </span>
           )}
@@ -380,7 +377,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                       ))}
                   </div>
                 )}
-                {!supplierSearch && <p className="text-xs text-slate-400 text-center">Optional — select if known</p>}
+                {/* {!supplierSearch && <p className="text-xs text-slate-400 text-center">Optional — select if known</p>} */}
               </div>
             )}
           </div>

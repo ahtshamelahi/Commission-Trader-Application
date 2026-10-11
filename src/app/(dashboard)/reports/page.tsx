@@ -47,7 +47,7 @@ export default function ReportsPage() {
     <>
       <TopHeader
         title="Financial & Business Reports"
-        subtitle="Generate purchase, sales, stock, expense, and crop-wise P&L statements with print & CSV export"
+      // subtitle="Generate purchase, sales, stock, expense, and crop-wise P&L statements with print & CSV export"
       />
       <div className="mt-6">
         <ReportsView

@@ -87,8 +87,8 @@ export function SidebarNavigation() {
           <LogOut className="w-4 h-4" />
           <span>Logout</span>
         </button>
-        <p>Commission Shop Management</p>
-        <p className="text-[10px] text-slate-600 mt-0.5">PKR / 40kg Maund Standard</p>
+        <p>M Shafiq Commission Traders</p>
+        {/* <p className="text-[10px] text-slate-600 mt-0.5">PKR / 40kg Maund Standard</p> */}
       </div>
     </aside>
   );

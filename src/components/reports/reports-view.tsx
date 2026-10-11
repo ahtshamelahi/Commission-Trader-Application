@@ -151,41 +151,36 @@ export function ReportsView({
           <div className="flex items-center gap-1.5 overflow-x-auto">
             <button
               onClick={() => setActiveTab('pnl')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                activeTab === 'pnl' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'pnl' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
             >
               <BarChart3 className="w-3.5 h-3.5 inline mr-1" /> Profit & Loss
             </button>
             <button
               onClick={() => setActiveTab('purchases')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                activeTab === 'purchases' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'purchases' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
             >
               <ShoppingCart className="w-3.5 h-3.5 inline mr-1" /> Purchases
             </button>
             <button
               onClick={() => setActiveTab('sales')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                activeTab === 'sales' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'sales' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
             >
               <TrendingUp className="w-3.5 h-3.5 inline mr-1" /> Sales
             </button>
             <button
               onClick={() => setActiveTab('stock')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                activeTab === 'stock' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'stock' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
             >
               <Boxes className="w-3.5 h-3.5 inline mr-1" /> Stock Inventory
             </button>
             <button
               onClick={() => setActiveTab('expenses')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                activeTab === 'expenses' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'expenses' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
             >
               <Receipt className="w-3.5 h-3.5 inline mr-1" /> Expenses
             </button>
@@ -237,7 +232,7 @@ export function ReportsView({
         {/* Printable Letterhead Header */}
         <div className="border-b border-slate-200 pb-4 mb-6 text-center sm:text-left flex flex-col sm:flex-row justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 uppercase">Al-Barakah Commission Shop</h1>
+            <h1 className="text-2xl font-bold text-slate-900 uppercase">M-Shafiq Commission Shop</h1>
             <p className="text-xs text-slate-500">Pakistani Crop Trading & Financial Statement</p>
           </div>
           <div className="mt-3 sm:mt-0 text-right text-xs text-slate-500">

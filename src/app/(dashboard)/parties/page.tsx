@@ -29,7 +29,7 @@ export default function PartiesPage() {
     <>
       <TopHeader
         title="Parties & Crop Catalog"
-        subtitle="Manage your suppliers, buyers, and crop types for purchase and sale transactions"
+      // subtitle="Manage your suppliers, buyers, and crop types for purchase and sale transactions"
       />
       <PartiesClientPage initialParties={parties} initialCrops={crops} isLoading={isLoading} />
     </>
