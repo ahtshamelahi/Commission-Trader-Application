@@ -537,7 +537,16 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
             </div>
             <div className="p-3">
               {crops.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-4">No crops registered. Add crops in Parties first.</p>
+                <div className="py-6 px-4 text-center">
+                  <p className="text-sm font-semibold text-slate-600 mb-1">No crops registered yet</p>
+                  <p className="text-xs text-slate-400 mb-3">Add crop types in Parties & Crop Catalog first.</p>
+                  <a
+                    href="/parties"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800"
+                  >
+                    Go to Crop Catalog →
+                  </a>
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {crops.map((crop) => {
@@ -618,7 +627,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
                 </span>
               </div>
               <div className="px-4 py-3">
-                <div className="grid grid-cols-4 gap-3 mb-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Bags</label>
                     <input type="number" step="1" min="0" placeholder="0"

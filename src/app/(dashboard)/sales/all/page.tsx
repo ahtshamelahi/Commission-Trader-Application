@@ -1,14 +1,14 @@
-import React from 'react';
-import { DashboardLayout } from '@/app/dashboard/dashboard-layout';
+import React, { Suspense } from 'react';
 import { TopHeader } from '@/components/layout/top-header';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { AllSalesView } from '@/components/sales/all-sales-view';
 import { Sale } from '@/types/sale-data-types';
 import { Crop } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
-import { connection } from 'next/server';
 
-export default async function AllSalesPage() {
+export const dynamic = 'force-dynamic';
+
+async function SalesAllData() {
   const supabase = getSupabaseServerClient();
 
   const [salesRes, cropsRes, buyersRes] = await Promise.all([
@@ -28,13 +28,19 @@ export default async function AllSalesPage() {
   const crops: Crop[] = cropsRes.data || [];
   const buyers: Party[] = buyersRes.data || [];
 
+  return <AllSalesView sales={sales} crops={crops} buyers={buyers} />;
+}
+
+export default function AllSalesPage() {
   return (
-    <DashboardLayout>
+    <>
       <TopHeader
         title="All Sales"
-        subtitle={`${sales.length} total sale record(s) — filter by crop, buyer, or date`}
+        subtitle="Filter by crop, buyer, or date"
       />
-      <AllSalesView sales={sales} crops={crops} buyers={buyers} />
-    </DashboardLayout>
+      <Suspense fallback={null}>
+        <SalesAllData />
+      </Suspense>
+    </>
   );
 }

@@ -1,9 +1,6 @@
-import React from 'react';
-import { DashboardLayout } from '../dashboard/dashboard-layout';
+import React, { Suspense } from 'react';
 import { TopHeader } from '@/components/layout/top-header';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
-import { calculateProfitAndLoss } from '@/lib/calculations/profit-loss-calculation';
-import { buildCropStockSummary } from '@/lib/calculations/current-stock-calculation';
 import { Crop } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 import { Purchase } from '@/types/purchase-data-types';
@@ -12,9 +9,9 @@ import { Expense } from '@/types/expense-data-types';
 import { StockMovement } from '@/types/stock-data-types';
 import { ReportsView } from '@/components/reports/reports-view';
 
-import { connection } from 'next/server';
+export const dynamic = 'force-dynamic';
 
-export default async function ReportsPage() {
+async function ReportsPageData() {
   const supabase = getSupabaseServerClient();
 
   const [cropsRes, partiesRes, purchasesRes, salesRes, expensesRes, movementsRes] = await Promise.all([
@@ -34,19 +31,26 @@ export default async function ReportsPage() {
   const movements: StockMovement[] = movementsRes.data || [];
 
   return (
-    <DashboardLayout>
-      <TopHeader title="Financial & Business Reports" subtitle="Generate purchase, sales, stock, expense, and crop-wise P&L statements with print & CSV export" />
+    <div className="mt-6">
+      <ReportsView
+        crops={crops}
+        parties={parties}
+        purchases={purchases}
+        sales={sales}
+        expenses={expenses}
+        movements={movements}
+      />
+    </div>
+  );
+}
 
-      <div className="mt-6">
-        <ReportsView
-          crops={crops}
-          parties={parties}
-          purchases={purchases}
-          sales={sales}
-          expenses={expenses}
-          movements={movements}
-        />
-      </div>
-    </DashboardLayout>
+export default function ReportsPage() {
+  return (
+    <>
+      <TopHeader title="Financial & Business Reports" subtitle="Generate purchase, sales, stock, expense, and crop-wise P&L statements with print & CSV export" />
+      <Suspense fallback={null}>
+        <ReportsPageData />
+      </Suspense>
+    </>
   );
 }

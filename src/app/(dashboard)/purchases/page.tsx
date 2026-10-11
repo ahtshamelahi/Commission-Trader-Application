@@ -1,17 +1,17 @@
-import React from 'react';
-import { DashboardLayout } from '../dashboard/dashboard-layout';
+import React, { Suspense } from 'react';
 import { TopHeader } from '@/components/layout/top-header';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { PurchaseEntryForm } from '@/components/purchases/purchase-entry-form';
 import { PurchaseDetailsTable } from '@/components/purchases/purchase-details-table';
-import { ShoppingCart, History } from 'lucide-react';
+import { History } from 'lucide-react';
 import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 import { Purchase } from '@/types/purchase-data-types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PurchasesPage() {
+// ─── Data-fetching component ─────────────────────────────────────────────────
+async function PurchasesData() {
   const supabase = getSupabaseServerClient();
 
   const [cropsRes, varietiesRes, suppliersRes, purchasesRes] = await Promise.all([
@@ -30,28 +30,29 @@ export default async function PurchasesPage() {
   const purchases: Purchase[] = purchasesRes.data || [];
 
   return (
-    <DashboardLayout>
+    <div className="mt-4 space-y-4">
+      <section className="space-y-3">
+        <PurchaseEntryForm crops={crops} suppliers={suppliers} />
+      </section>
+      <section className="space-y-3 pt-3 border-t border-slate-200">
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <History className="w-5 h-5 text-slate-700" />
+          <h2 className="text-base font-bold text-slate-800">Recent Purchase History</h2>
+        </div>
+        <PurchaseDetailsTable purchases={purchases} />
+      </section>
+    </div>
+  );
+}
+
+// ─── Page shell — renders instantly ─────────────────────────────────────────
+export default function PurchasesPage() {
+  return (
+    <>
       <TopHeader title="Crop Purchases" subtitle="Record crop purchases, calculate commission deductions, and incoming stock" />
-
-      <div className="mt-4 space-y-4">
-        {/* Entry Form */}
-        <section className="space-y-3">
-          {/* <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-            <ShoppingCart className="w-5 h-5 text-emerald-700" />
-            <h2 className="text-base font-bold text-slate-800">New Purchase Transaction</h2>
-          </div> */}
-          <PurchaseEntryForm crops={crops} suppliers={suppliers} />
-        </section>
-
-        {/* History Table */}
-        <section className="space-y-3 pt-3 border-t border-slate-200">
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-            <History className="w-5 h-5 text-slate-700" />
-            <h2 className="text-base font-bold text-slate-800">Recent Purchase History</h2>
-          </div>
-          <PurchaseDetailsTable purchases={purchases} />
-        </section>
-      </div>
-    </DashboardLayout>
+      <Suspense fallback={null}>
+        <PurchasesData />
+      </Suspense>
+    </>
   );
 }

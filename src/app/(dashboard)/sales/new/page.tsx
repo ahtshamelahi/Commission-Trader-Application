@@ -1,5 +1,4 @@
-import React from 'react';
-import { DashboardLayout } from '@/app/dashboard/dashboard-layout';
+import React, { Suspense } from 'react';
 import { TopHeader } from '@/components/layout/top-header';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { PosSaleForm } from '@/components/sales/pos-sale-form';
@@ -7,7 +6,7 @@ import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 export const dynamic = 'force-dynamic';
 
-export default async function NewSalePage() {
+async function SaleFormData() {
   const supabase = getSupabaseServerClient();
 
   const [cropsRes, varietiesRes, buyersRes, purchasesRes, salesRes] = await Promise.all([
@@ -27,13 +26,19 @@ export default async function NewSalePage() {
   const purchases = purchasesRes.data || [];
   const sales = salesRes.data || [];
 
+  return <PosSaleForm crops={crops} buyers={buyers} purchases={purchases as any} sales={sales as any} />;
+}
+
+export default function NewSalePage() {
   return (
-    <DashboardLayout>
+    <>
       <TopHeader
         title="New Sale"
         subtitle="Select crop category & variety → add items to cart → finalize invoice"
       />
-      <PosSaleForm crops={crops} buyers={buyers} purchases={purchases as any} sales={sales as any} />
-    </DashboardLayout>
+      <Suspense fallback={null}>
+        <SaleFormData />
+      </Suspense>
+    </>
   );
 }
