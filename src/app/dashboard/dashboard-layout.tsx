@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { SidebarNavigation } from '@/components/layout/sidebar-navigation';
 import { MobileNavigation } from '@/components/layout/mobile-navigation';

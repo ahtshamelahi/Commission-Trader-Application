@@ -11,7 +11,6 @@ import { calculateAvailableStock } from '@/lib/calculations/current-stock-calcul
 import { connection } from 'next/server';
 
 export default async function DashboardPage() {
-  await connection();
   const supabase = getSupabaseServerClient();
 
   // Define date range for "Today" in PKT (Asia/Karachi)

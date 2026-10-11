@@ -28,20 +28,20 @@ export async function middleware(request: NextRequest) {
   );
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   const isAuthRoute = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/forgot-password' || request.nextUrl.pathname === '/reset-password';
 
   // If not authenticated and trying to access a protected route
-  if (!user && !isAuthRoute) {
+  if (!session && !isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
   // If authenticated and trying to access auth pages, redirect to dashboard
-  if (user && isAuthRoute) {
+  if (session && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);

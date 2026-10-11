@@ -9,7 +9,6 @@ import { Receipt, History, Wallet } from 'lucide-react';
 import { connection } from 'next/server';
 
 export default async function ExpensesPage() {
-  await connection();
   const supabase = getSupabaseServerClient();
 
   const [expensesRes, purchasesRes] = await Promise.all([

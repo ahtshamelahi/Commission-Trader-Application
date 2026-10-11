@@ -13,7 +13,6 @@ import { StockMovement } from '@/types/stock-data-types';
 import { connection } from 'next/server';
 
 export default async function StockPage() {
-  await connection();
   const supabase = getSupabaseServerClient();
 
   const [cropsRes, varietiesRes, purchasesRes, salesRes, movementsRes] = await Promise.all([

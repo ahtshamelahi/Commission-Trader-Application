@@ -12,7 +12,6 @@ import { Purchase } from '@/types/purchase-data-types';
 import { connection } from 'next/server';
 
 export default async function PurchasesPage() {
-  await connection();
   const supabase = getSupabaseServerClient();
 
   const [cropsRes, varietiesRes, suppliersRes, purchasesRes] = await Promise.all([

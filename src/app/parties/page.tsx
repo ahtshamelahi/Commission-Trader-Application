@@ -8,7 +8,6 @@ import { Crop } from '@/types/crop-data-types';
 import { connection } from 'next/server';
 
 export default async function PartiesPage() {
-  await connection();
   const supabase = getSupabaseServerClient();
 
   const [partiesRes, cropsRes] = await Promise.all([

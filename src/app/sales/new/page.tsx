@@ -8,7 +8,6 @@ import { Party } from '@/types/party-data-types';
 import { connection } from 'next/server';
 
 export default async function NewSalePage() {
-  await connection();
   const supabase = getSupabaseServerClient();
 
   const [cropsRes, varietiesRes, buyersRes, purchasesRes, salesRes] = await Promise.all([

@@ -15,7 +15,6 @@ import { ReportsView } from '@/components/reports/reports-view';
 import { connection } from 'next/server';
 
 export default async function ReportsPage() {
-  await connection();
   const supabase = getSupabaseServerClient();
 
   const [cropsRes, partiesRes, purchasesRes, salesRes, expensesRes, movementsRes] = await Promise.all([
