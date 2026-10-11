@@ -4,11 +4,16 @@ import { MobileNavigation } from '@/components/layout/mobile-navigation';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col md:flex-row">
+      {/* Desktop sidebar — hidden on mobile */}
       <SidebarNavigation />
-      <MobileNavigation />
+
+      {/* Right side: mobile nav + content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 p-3 md:p-4 max-w-7xl w-full mx-auto">{children}</main>
+        {/* Mobile top nav — hidden on desktop */}
+        <MobileNavigation />
+
+        <main className="flex-1 p-3 md:p-4 w-full mx-auto max-w-7xl">{children}</main>
       </div>
     </div>
   );
