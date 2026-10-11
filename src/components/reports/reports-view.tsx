@@ -1,20 +1,237 @@
 'use client';
 
-import React, { useState } from 'react';
+// src/components/reports/reports-view.tsx  (PDF generator included in this file)
+import React, { useMemo, useState } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Loader2, Receipt, ShoppingCart, TrendingUp, FileDown, ExternalLink } from 'lucide-react';
 import { Crop } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 import { Purchase } from '@/types/purchase-data-types';
 import { Sale } from '@/types/sale-data-types';
 import { Expense } from '@/types/expense-data-types';
 import { StockMovement } from '@/types/stock-data-types';
-import { calculateProfitAndLoss } from '@/lib/calculations/profit-loss-calculation';
-import { buildCropStockSummary } from '@/lib/calculations/current-stock-calculation';
-import { ReusableDataTable, Column } from '@/components/ui/reusable-data-table';
-import { PrimaryButton } from '@/components/ui/primary-button';
-import { DropdownSelectField } from '@/components/ui/dropdown-select-field';
-import { TextInputField } from '@/components/ui/text-input-field';
-import { Printer, Download, Filter, BarChart3, ShoppingCart, TrendingUp, Boxes, Receipt } from 'lucide-react';
 
+/* ----------------------------- PDF generator ----------------------------- */
+const SHOP_NAME = 'M Shafiq Commission Shop';
+
+type TradeKind = 'sales' | 'purchases';
+
+interface TradeReportRow {
+  date: string; // YYYY-MM-DD
+  party: string; // buyer (sales) or seller (purchases)
+  ref: string; // id / bill number
+  totalWeight: number;
+  commissionWeight: number;
+  pricePerMaund: number;
+  totalPrice: number;
+  expenses: number;
+}
+
+const nf = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
+
+const prettyDate = (iso: string) => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+function buildTradeReportPdf(opts: {
+  kind: TradeKind;
+  rows: TradeReportRow[];
+  from: string;
+  to: string;
+}) {
+  const { kind, rows, from, to } = opts;
+  const isSales = kind === 'sales';
+  const partyLabel = isSales ? 'Buyer' : 'Seller';
+  const title = isSales ? 'Sales Report' : 'Purchase Report';
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  // ----- Heading (centered) -----
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(17);
+  doc.text(SHOP_NAME, pageW / 2, 13, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  const rangeText =
+    from || to
+      ? `${from ? prettyDate(from) : 'Beginning'}  to  ${to ? prettyDate(to) : 'Present'}`
+      : 'All dates';
+  doc.text(`${title}   |   ${rangeText}`, pageW / 2, 19, { align: 'center' });
+
+  doc.setDrawColor(200, 210, 215);
+  doc.line(10, 22, pageW - 10, 22);
+
+  // ----- Totals -----
+  const sum = (k: keyof TradeReportRow) => rows.reduce((t, r) => t + (r[k] as number), 0);
+  const showExpenses = !isSales; // sales have no expenses
+
+  const head = [
+    'Date',
+    `${partyLabel} Name`,
+    'ID',
+    'Total Weight (kg)',
+    'Commission Weight (kg)',
+    'Price / Maund (40 kg)',
+    'Total Price',
+    ...(showExpenses ? ['Expenses'] : []),
+  ];
+
+  const body = rows.map((r) => [
+    prettyDate(r.date),
+    r.party,
+    r.ref,
+    nf(r.totalWeight),
+    nf(r.commissionWeight),
+    nf(r.pricePerMaund),
+    nf(r.totalPrice),
+    ...(showExpenses ? [nf(r.expenses)] : []),
+  ]);
+
+  const foot = [
+    { content: `Total (${rows.length} records)`, colSpan: 3, styles: { halign: 'right' as const } },
+    nf(sum('totalWeight')),
+    nf(sum('commissionWeight')),
+    '',
+    nf(sum('totalPrice')),
+    ...(showExpenses ? [nf(sum('expenses'))] : []),
+  ];
+
+  const columnStyles: Record<number, { halign: 'right' }> = {};
+  for (let i = 3; i < head.length; i++) columnStyles[i] = { halign: 'right' };
+
+  // ----- Table (small font so many rows fit on one page) -----
+  autoTable(doc, {
+    head: [head],
+    body,
+    foot: [foot],
+    showFoot: 'lastPage',
+    startY: 25,
+    margin: { top: 12, left: 10, right: 10, bottom: 12 },
+    theme: 'grid',
+    styles: {
+      fontSize: 7,
+      cellPadding: { top: 1, bottom: 1, left: 1.5, right: 1.5 },
+      lineColor: [210, 218, 224],
+      lineWidth: 0.1,
+      textColor: [15, 23, 42],
+    },
+    headStyles: { fillColor: [4, 120, 87], textColor: 255, fontSize: 7.5, fontStyle: 'bold' },
+    footStyles: { fillColor: [226, 240, 233], textColor: [15, 23, 42], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [246, 249, 248] },
+    columnStyles,
+  });
+
+  // ----- Footer on every page -----
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(110);
+    doc.text(`Generated ${new Date().toLocaleString('en-GB')}`, 10, pageH - 6);
+    doc.text(`Page ${i} of ${pages}`, pageW - 10, pageH - 6, { align: 'right' });
+  }
+
+  const fileName = `${kind}-report_${from || 'start'}_to_${to || 'today'}.pdf`;
+  return { doc, fileName };
+}
+
+/* ------------------------- map DB rows -> report rows ------------------------- */
+const toNum = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const localISO = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const toISODate = (v: unknown) => {
+  if (!v) return '';
+  const s = String(v);
+  if (s.length === 10) return s; // already YYYY-MM-DD
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? '' : localISO(d);
+};
+
+const partyName = (p: unknown) => (p as { name?: string } | undefined)?.name ?? '-';
+const byDate = (a: TradeReportRow, b: TradeReportRow) => a.date.localeCompare(b.date);
+
+function normalizeSales(rows: Sale[]): TradeReportRow[] {
+  return rows
+    .map((r) => ({
+      date: toISODate(r.created_at),
+      party: partyName(r.parties),
+      ref: r.invoice_no ?? String(r.id),
+      totalWeight: toNum(r.physical_weight_kg),
+      commissionWeight: toNum(r.commission_weight_kg),
+      pricePerMaund: toNum(r.rate_per_40kg),
+      totalPrice: toNum(r.sale_amount),
+      expenses: 0, // sales have no expense column
+    }))
+    .sort(byDate);
+}
+
+function normalizePurchases(rows: Purchase[]): TradeReportRow[] {
+  return rows
+    .map((r) => ({
+      date: toISODate(r.created_at),
+      party: partyName(r.parties),
+      ref: r.invoice_no ?? String(r.id),
+      totalWeight: toNum(r.gross_weight_kg),
+      commissionWeight: toNum(r.commission_weight_kg),
+      pricePerMaund: toNum(r.rate_per_40kg),
+      totalPrice: toNum(r.crop_amount),
+      expenses: (r.purchase_expenses ?? []).reduce((sum, e) => sum + toNum(e.amount), 0),
+    }))
+    .sort(byDate);
+}
+
+/* ----------------------------- date presets ----------------------------- */
+type Preset = 'today' | 'week' | 'month' | 'lastMonth' | 'all' | 'custom';
+
+const PRESETS: { id: Preset; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: 'week', label: 'Last 7 days' },
+  { id: 'month', label: 'This month' },
+  { id: 'lastMonth', label: 'Last month' },
+  { id: 'all', label: 'All time' },
+  { id: 'custom', label: 'Custom' },
+];
+
+function presetRange(p: Preset): { from: string; to: string } | null {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  switch (p) {
+    case 'today':
+      return { from: localISO(now), to: localISO(now) };
+    case 'week': {
+      const s = new Date(now);
+      s.setDate(s.getDate() - 6);
+      return { from: localISO(s), to: localISO(now) };
+    }
+    case 'month':
+      return { from: localISO(new Date(y, m, 1)), to: localISO(now) };
+    case 'lastMonth':
+      return { from: localISO(new Date(y, m - 1, 1)), to: localISO(new Date(y, m, 0)) };
+    case 'all':
+      return { from: '', to: '' };
+    default:
+      return null;
+  }
+}
+
+/* -------------------------------- component ------------------------------- */
 interface ReportsViewProps {
   crops: Crop[];
   parties: Party[];
@@ -22,353 +239,207 @@ interface ReportsViewProps {
   sales: Sale[];
   expenses: Expense[];
   movements: StockMovement[];
-  isLoading?: boolean;
+  isLoading: boolean;
 }
 
-export function ReportsView({
-  crops,
-  parties,
-  purchases,
-  sales,
-  expenses,
-  movements,
-  isLoading = false,
-}: ReportsViewProps) {
-  const [activeTab, setActiveTab] = useState<'pnl' | 'purchases' | 'sales' | 'stock' | 'expenses'>('pnl');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [selectedCropId, setSelectedCropId] = useState<string>('');
-  const [selectedPartyId, setSelectedPartyId] = useState<string>('');
+type Active = 'sales' | 'purchases' | 'profit-loss' | null;
 
-  // Date Filtering Helper
-  const filterByDate = <T extends { created_at?: string; expense_date?: string }>(items: T[]) => {
-    return items.filter((item) => {
-      const dateStr = item.created_at || item.expense_date;
-      if (!dateStr) return true;
-      const itemDate = new Date(dateStr).getTime();
+export function ReportsView({ purchases, sales, isLoading }: ReportsViewProps) {
+  const [active, setActive] = useState<Active>(null);
+  const [preset, setPreset] = useState<Preset>('month');
+  const [from, setFrom] = useState(() => presetRange('month')!.from);
+  const [to, setTo] = useState(() => presetRange('month')!.to);
 
-      if (startDate && itemDate < new Date(startDate).getTime()) return false;
-      if (endDate && itemDate > new Date(endDate).setHours(23, 59, 59, 999)) return false;
-      return true;
-    });
-  };
+  const kind: TradeKind | null = active === 'sales' || active === 'purchases' ? active : null;
 
-  // Filtered Datasets
-  let filteredPurchases = filterByDate(purchases);
-  let filteredSales = filterByDate(sales);
-  let filteredExpenses = filterByDate(expenses);
-
-  if (selectedCropId) {
-    const cid = Number(selectedCropId);
-    filteredPurchases = filteredPurchases.filter((p) => p.crop_id === cid);
-    filteredSales = filteredSales.filter((s) => s.crop_id === cid);
-  }
-
-  if (selectedPartyId) {
-    const pid = Number(selectedPartyId);
-    filteredPurchases = filteredPurchases.filter((p) => p.supplier_id === pid);
-    filteredSales = filteredSales.filter((s) => s.buyer_id === pid);
-  }
-
-  // Calculated Summaries
-  const pnl = calculateProfitAndLoss(filteredSales, filteredPurchases, filteredExpenses);
-
-  const cropSummaries = crops.map((c) =>
-    buildCropStockSummary(c.id, c.name, filteredPurchases, filteredSales, movements)
+  const allRows = useMemo(
+    () => ({
+      sales: normalizeSales(sales),
+      purchases: normalizePurchases(purchases),
+    }),
+    [sales, purchases]
   );
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const rows = useMemo(() => {
+    if (!kind) return [];
+    return allRows[kind].filter((r) => (!from || r.date >= from) && (!to || r.date <= to));
+  }, [allRows, kind, from, to]);
 
-  // Export CSV Helper
-  const handleExportCSV = () => {
-    let headers: string[] = [];
-    let rows: string[][] = [];
-    let filename = `report-${activeTab}.csv`;
+  const totalPrice = rows.reduce((s, r) => s + r.totalPrice, 0);
+  const totalExpenses = rows.reduce((s, r) => s + r.expenses, 0);
+  const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
 
-    if (activeTab === 'purchases') {
-      headers = ['Invoice No', 'Crop', 'Supplier', 'Bags', 'Gross Weight (kg)', 'Net Weight (kg)', 'Rate/40kg', 'Crop Amount (PKR)', 'Date'];
-      rows = filteredPurchases.map((p) => [
-        p.invoice_no || '',
-        p.crops?.name || '',
-        p.parties?.name || '',
-        String(p.bags || 0),
-        String(p.gross_weight_kg || 0),
-        String(p.net_weight_kg || 0),
-        String(p.rate_per_40kg || 0),
-        String(p.crop_amount || 0),
-        new Date(p.created_at).toLocaleDateString('en-PK'),
-      ]);
-    } else if (activeTab === 'sales') {
-      headers = ['Invoice No', 'Crop', 'Buyer', 'Physical Weight Delivered (kg)', 'Billable Weight (kg)', 'Rate/40kg', 'Sale Amount (PKR)', 'Date'];
-      rows = filteredSales.map((s) => [
-        s.invoice_no || '',
-        s.crops?.name || '',
-        s.parties?.name || '',
-        String(s.physical_weight_kg || 0),
-        String(s.billable_weight_kg || 0),
-        String(s.rate_per_40kg || 0),
-        String(s.sale_amount || 0),
-        new Date(s.created_at).toLocaleDateString('en-PK'),
-      ]);
-    } else if (activeTab === 'expenses') {
-      headers = ['ID', 'Category', 'Amount (PKR)', 'Notes', 'Date'];
-      rows = filteredExpenses.map((e) => [
-        String(e.id),
-        e.category,
-        String(e.amount),
-        e.notes || '',
-        new Date(e.expense_date).toLocaleDateString('en-PK'),
-      ]);
-    } else {
-      headers = ['Crop Name', 'Total Purchased (kg)', 'Total Sold (kg)', 'Available Stock (kg)', 'Avg Cost/40kg', 'Avg Cost/kg'];
-      rows = cropSummaries.map((cs) => [
-        cs.name,
-        String(cs.totalPurchasedWeightKg),
-        String(cs.totalSoldPhysicalWeightKg),
-        String(cs.currentAvailableStockKg),
-        String(cs.averageCostPer40KgPkr),
-        String(cs.averageCostPerKgPkr),
-      ]);
+  const choosePreset = (p: Preset) => {
+    setPreset(p);
+    const r = presetRange(p);
+    if (r) {
+      setFrom(r.from);
+      setTo(r.to);
     }
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
+
+  const makePdf = (mode: 'open' | 'download') => {
+    if (!kind || rows.length === 0) return;
+    const { doc, fileName } = buildTradeReportPdf({ kind, rows, from, to });
+    if (mode === 'download') doc.save(fileName);
+    else window.open(doc.output('bloburl') as unknown as string, '_blank');
+  };
+
+  const cards = [
+    {
+      id: 'sales' as const,
+      title: 'Sales Report',
+      note: 'Buyers, weights, rates and totals',
+      Icon: Receipt,
+      enabled: true,
+    },
+    {
+      id: 'purchases' as const,
+      title: 'Purchase Report',
+      note: 'Sellers, weights, rates and totals',
+      Icon: ShoppingCart,
+      enabled: true,
+    },
+    {
+      id: 'profit-loss' as const,
+      title: 'Profit / Loss Report',
+      note: 'Coming next',
+      Icon: TrendingUp,
+      enabled: false,
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Control Bar (Filters & Export) - Hidden during print */}
-      <div className="no-print bg-white p-4 border border-slate-200 rounded-md shadow-2xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto">
+      {/* THREE REPORT BUTTONS */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {cards.map(({ id, title, note, Icon, enabled }) => {
+          const selected = active === id;
+          return (
             <button
-              onClick={() => setActiveTab('pnl')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'pnl' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              key={id}
+              type="button"
+              disabled={!enabled || isLoading}
+              onClick={() => setActive(id)}
+              className={`text-left rounded-2xl border p-5 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed ${selected
+                ? 'bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-900/20'
+                : 'bg-white border-slate-200 text-slate-900 hover:border-emerald-400 hover:shadow-md disabled:opacity-60 disabled:hover:border-slate-200 disabled:hover:shadow-none'
                 }`}
             >
-              <BarChart3 className="w-3.5 h-3.5 inline mr-1" /> Profit & Loss
+              <div
+                className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 ${selected ? 'bg-white/20' : 'bg-emerald-50 text-emerald-700'
+                  }`}
+              >
+                {isLoading && enabled ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Icon className="w-5 h-5" />
+                )}
+              </div>
+              <div className="text-lg font-extrabold tracking-tight">{title}</div>
+              <div className={`mt-1 text-sm ${selected ? 'text-emerald-100' : 'text-slate-500'}`}>{note}</div>
             </button>
-            <button
-              onClick={() => setActiveTab('purchases')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'purchases' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-            >
-              <ShoppingCart className="w-3.5 h-3.5 inline mr-1" /> Purchases
-            </button>
-            <button
-              onClick={() => setActiveTab('sales')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'sales' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5 inline mr-1" /> Sales
-            </button>
-            <button
-              onClick={() => setActiveTab('stock')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'stock' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-            >
-              <Boxes className="w-3.5 h-3.5 inline mr-1" /> Stock Inventory
-            </button>
-            <button
-              onClick={() => setActiveTab('expenses')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${activeTab === 'expenses' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-            >
-              <Receipt className="w-3.5 h-3.5 inline mr-1" /> Expenses
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <PrimaryButton variant="outline" onClick={handleExportCSV} className="text-xs">
-              <Download className="w-3.5 h-3.5 mr-1" /> CSV Export
-            </PrimaryButton>
-            <PrimaryButton variant="secondary" onClick={handlePrint} className="text-xs">
-              <Printer className="w-3.5 h-3.5 mr-1" /> Print Report
-            </PrimaryButton>
-          </div>
-        </div>
-
-        {/* Date & Dropdown Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <TextInputField
-            label="Start Date"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-          <TextInputField
-            label="End Date"
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-          <DropdownSelectField
-            label="Filter Crop"
-            value={selectedCropId}
-            onChange={(e) => setSelectedCropId(e.target.value)}
-            options={crops.map((c) => ({ value: c.id, label: c.name }))}
-            placeholder="All Crops"
-          />
-          <DropdownSelectField
-            label="Filter Party"
-            value={selectedPartyId}
-            onChange={(e) => setSelectedPartyId(e.target.value)}
-            options={parties.map((p) => ({ value: p.id, label: `${p.name} (${p.party_type})` }))}
-            placeholder="All Parties"
-          />
-        </div>
+          );
+        })}
       </div>
 
-      {/* Printable Report Document View */}
-      <div className="bg-white border border-slate-200 rounded-md p-6 shadow-2xs print-shadow-none">
-        {/* Printable Letterhead Header */}
-        <div className="border-b border-slate-200 pb-4 mb-6 text-center sm:text-left flex flex-col sm:flex-row justify-between items-start">
+      {/* FILTERS + GENERATE */}
+      {kind && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 uppercase">M-Shafiq Commission Shop</h1>
-            <p className="text-xs text-slate-500">Pakistani Crop Trading & Financial Statement</p>
+            <h3 className="text-lg font-extrabold text-slate-900">
+              {kind === 'sales' ? 'Sales Report' : 'Purchase Report'}
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">Choose the period, then generate the PDF.</p>
           </div>
-          <div className="mt-3 sm:mt-0 text-right text-xs text-slate-500">
-            <p className="font-bold text-slate-800">
-              Report: {activeTab.toUpperCase()}
-            </p>
-            <p>Generated: {new Date().toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' })}</p>
-            {(startDate || endDate) && (
-              <p className="text-emerald-700 font-semibold">
-                Period: {startDate || 'Beginning'} to {endDate || 'Present'}
-              </p>
+
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => choosePreset(p.id)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${preset === p.id
+                  ? 'bg-emerald-700 border-emerald-700 text-white'
+                  : 'bg-white border-slate-300 text-slate-700 hover:border-emerald-500'
+                  }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 max-w-lg">
+            <div>
+              <label className="text-sm font-bold text-slate-700 block mb-1">From</label>
+              <input
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => {
+                  setFrom(e.target.value);
+                  setPreset('custom');
+                }}
+                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-bold text-slate-700 block mb-1">To</label>
+              <input
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => {
+                  setTo(e.target.value);
+                  setPreset('custom');
+                }}
+                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          {/* summary of what will be in the PDF */}
+          <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-900">
+            {rows.length === 0 ? (
+              <span className="font-semibold">
+                No {kind === 'sales' ? 'sales' : 'purchases'} found
+                {from || to ? ` between ${from ? prettyDate(from) : 'the beginning'} and ${to ? prettyDate(to) : 'today'}` : ''}.
+              </span>
+            ) : (
+              <span>
+                <span className="font-bold">{rows.length}</span> {kind === 'sales' ? 'sales' : 'purchases'} · Total price{' '}
+                <span className="font-bold">{fmt(totalPrice)}</span>
+                {kind === 'purchases' && (
+                  <>
+                    {' '}· Expenses <span className="font-bold">{fmt(totalExpenses)}</span>
+                  </>
+                )}
+              </span>
             )}
           </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={rows.length === 0}
+              onClick={() => makePdf('open')}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Generate PDF
+            </button>
+            <button
+              type="button"
+              disabled={rows.length === 0}
+              onClick={() => makePdf('download')}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold text-emerald-800 bg-white border border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <FileDown className="w-4 h-4" />
+              Download
+            </button>
+          </div>
         </div>
-
-        {/* Tab 1: Profit & Loss Statement */}
-        {activeTab === 'pnl' && (
-          <div className="space-y-6">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 uppercase">
-              Crop Profit & Loss Statement (Weighted-Average Costing)
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm shadow-2xs hover:border-slate-300 transition-all">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Total Sales Revenue</span>
-                <span className="text-lg font-bold tracking-tight text-slate-900 mt-2 block">Rs. {pnl.totalSaleRevenuePkr.toLocaleString()}</span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm shadow-2xs hover:border-slate-300 transition-all">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">Cost of Physical Goods Sold</span>
-                <span className="text-lg font-bold tracking-tight text-slate-800 mt-2 block">Rs. {pnl.totalCostOfGoodsSoldPkr.toLocaleString()}</span>
-              </div>
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-sm shadow-2xs hover:border-emerald-300 transition-all">
-                <span className="text-[10px] font-bold text-emerald-800 uppercase block tracking-wider">Gross Profit</span>
-                <span className="text-lg font-bold tracking-tight text-emerald-800 mt-2 block">Rs. {pnl.grossProfitPkr.toLocaleString()}</span>
-              </div>
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-sm shadow-2xs hover:border-rose-300 transition-all">
-                <span className="text-[10px] font-bold text-rose-800 uppercase block tracking-wider">Total Operating Expenses</span>
-                <span className="text-lg font-bold tracking-tight text-rose-700 mt-2 block">Rs. {pnl.totalOperatingExpensesPkr.toLocaleString()}</span>
-              </div>
-            </div>
-
-            <div className="p-4 bg-emerald-800 text-white rounded-sm flex items-center justify-between shadow-2xs">
-              <div>
-                <h3 className="text-base font-bold">Net Profit / Loss for Selected Period</h3>
-                <p className="text-[10px] text-emerald-200 mt-0.5">Net Profit = Gross Profit − Operating Expenses</p>
-              </div>
-              <div className="text-right">
-                <span className="text-2xl font-bold tracking-tight">Rs. {pnl.netProfitPkr.toLocaleString()}</span>
-                <p className="text-[10px] font-medium text-emerald-200 mt-1">Margin: {pnl.profitMarginPercent}%</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Purchases Report */}
-        {activeTab === 'purchases' && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 uppercase">
-              Purchases Report Summary
-            </h2>
-            <ReusableDataTable
-              columns={[
-                { header: 'Invoice #', accessorKey: 'invoice_no' },
-                { header: 'Crop', cell: (r: Purchase) => r.crops?.name },
-                { header: 'Supplier', cell: (r: Purchase) => r.parties?.name },
-                { header: 'Bags', accessorKey: 'bags', align: 'center' },
-                { header: 'Gross (kg)', cell: (r: Purchase) => `${r.gross_weight_kg} kg`, align: 'right' },
-                { header: 'Net (kg)', cell: (r: Purchase) => `${r.net_weight_kg} kg`, align: 'right' },
-                { header: 'Rate/40kg', cell: (r: Purchase) => `Rs. ${r.rate_per_40kg}`, align: 'right' },
-                { header: 'Crop Amount', cell: (r: Purchase) => `Rs. ${Number(r.crop_amount).toLocaleString()}`, align: 'right' },
-              ]}
-              data={filteredPurchases}
-            />
-          </div>
-        )}
-
-        {/* Tab 3: Sales Report */}
-        {activeTab === 'sales' && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 uppercase">
-              Sales Report Summary
-            </h2>
-            <ReusableDataTable
-              columns={[
-                { header: 'Invoice #', accessorKey: 'invoice_no' },
-                { header: 'Crop', cell: (r: Sale) => r.crops?.name },
-                { header: 'Buyer', cell: (r: Sale) => r.parties?.name },
-                { header: 'Delivered (kg)', cell: (r: Sale) => `${r.physical_weight_kg} kg`, align: 'right' },
-                { header: 'Billable (kg)', cell: (r: Sale) => `${r.billable_weight_kg} kg`, align: 'right' },
-                { header: 'Rate/40kg', cell: (r: Sale) => `Rs. ${r.rate_per_40kg}`, align: 'right' },
-                { header: 'Sale Amount', cell: (r: Sale) => `Rs. ${Number(r.sale_amount).toLocaleString()}`, align: 'right' },
-              ]}
-              data={filteredSales}
-            />
-          </div>
-        )}
-
-        {/* Tab 4: Current Stock Report */}
-        {activeTab === 'stock' && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 uppercase">
-              Current Physical Stock Valuation Report
-            </h2>
-            <ReusableDataTable
-              columns={[
-                { header: 'Crop Category', accessorKey: 'name' },
-                { header: 'Total Purchased (kg)', cell: (r) => `${r.totalPurchasedWeightKg} kg`, align: 'right' },
-                { header: 'Total Sold (kg)', cell: (r) => `${r.totalSoldPhysicalWeightKg} kg`, align: 'right' },
-                { header: 'Available Stock (kg)', cell: (r) => `${r.currentAvailableStockKg} kg`, align: 'right' },
-                { header: 'Avg Cost / Maund', cell: (r) => `Rs. ${r.averageCostPer40KgPkr.toLocaleString()}`, align: 'right' },
-                { header: 'Inventory Value', cell: (r) => `Rs. ${r.totalPurchaseValuePkr.toLocaleString()}`, align: 'right' },
-              ]}
-              data={cropSummaries}
-            />
-          </div>
-        )}
-
-        {/* Tab 5: Expenses Report */}
-        {activeTab === 'expenses' && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 uppercase">
-              Operational Expense Report Summary
-            </h2>
-            <ReusableDataTable
-              columns={[
-                { header: 'ID', accessorKey: 'id' },
-                { header: 'Category', accessorKey: 'category' },
-                { header: 'Amount (PKR)', cell: (r: Expense) => `Rs. ${Number(r.amount).toLocaleString()}`, align: 'right' },
-                { header: 'Notes', accessorKey: 'notes' },
-                { header: 'Date', cell: (r: Expense) => new Date(r.expense_date).toLocaleDateString('en-PK'), align: 'right' },
-              ]}
-              data={filteredExpenses}
-            />
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
