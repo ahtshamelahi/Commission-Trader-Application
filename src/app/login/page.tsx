@@ -38,13 +38,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50">
-      {/* LEFT SIDE - Brand & Image */}
+    <div className="relative min-h-[100dvh] flex bg-slate-50">
+      {/* MOBILE BACKGROUND - crop image behind the whole page (hidden on desktop) */}
+      <div className="lg:hidden fixed inset-0 z-0" aria-hidden="true">
+        <img
+          src="/images/crop_background.png"
+          alt=""
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/70 via-emerald-900/45 to-emerald-950/85" />
+      </div>
+
+      {/* LEFT SIDE - Brand & Image (desktop only, unchanged) */}
       <div className="hidden lg:flex w-1/2 bg-slate-900 relative flex-col justify-center items-center overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img 
-            src="/images/crop_background.png" 
-            alt="Agricultural crops" 
+          <img
+            src="/images/crop_background.png"
+            alt="Agricultural crops"
             className="w-full h-full object-cover opacity-60"
           />
         </div>
@@ -60,12 +70,18 @@ export default function LoginPage() {
       </div>
 
       {/* RIGHT SIDE - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12">
-        <div className="w-full max-w-md space-y-8">
+      <div className="relative z-10 w-full lg:w-1/2 flex flex-col items-center justify-center gap-7 lg:gap-0 px-5 py-10 sm:p-12">
+        {/* Mobile brand, sits on top of the crop image */}
+        <div className="lg:hidden text-center text-white">
+          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-950/40 ring-4 ring-white/20">
+            <Store className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight drop-shadow">Al-Shafiq Commission Shop</h1>
+        </div>
+
+        {/* Card on mobile (frosted glass), plain on desktop */}
+        <div className="w-full max-w-md space-y-8 rounded-3xl bg-white/90 backdrop-blur-xl p-6 sm:p-8 shadow-2xl shadow-emerald-950/40 ring-1 ring-white/50 lg:bg-transparent lg:backdrop-blur-none lg:shadow-none lg:ring-0 lg:rounded-none lg:p-0">
           <div className="text-center">
-            <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-4 lg:hidden">
-              <Store className="w-6 h-6 text-white" />
-            </div>
             <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome Back</h2>
             <p className="mt-2 text-sm text-slate-500">Sign in to your account to continue</p>
           </div>
@@ -86,7 +102,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="admin@alshafiq.com"
                 />
               </div>
@@ -102,7 +118,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="••••••••"
                 />
               </div>
