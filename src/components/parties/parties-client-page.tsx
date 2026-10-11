@@ -23,6 +23,7 @@ import {
 interface PartiesClientPageProps {
   initialParties: Party[];
   initialCrops: Crop[];
+  isLoading?: boolean;
 }
 
 const PARTY_TYPES: { value: PartyType; label: string; desc: string; color: string }[] = [
@@ -49,7 +50,7 @@ function PartyTypeBadge({ type }: { type: PartyType }) {
   );
 }
 
-export function PartiesClientPage({ initialParties, initialCrops }: PartiesClientPageProps) {
+export function PartiesClientPage({ initialParties, initialCrops, isLoading = false }: PartiesClientPageProps) {
   // Party Form State
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -64,6 +65,14 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
   const [cropSubmitting, setCropSubmitting] = useState(false);
   const [cropMsg, setCropMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [crops, setCrops] = useState<Crop[]>(initialCrops);
+
+  React.useEffect(() => {
+    setParties(initialParties);
+  }, [initialParties]);
+
+  React.useEffect(() => {
+    setCrops(initialCrops);
+  }, [initialCrops]);
 
   // Variety Form State
   const [varietyName, setVarietyName] = useState('');
@@ -169,11 +178,10 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
               <div className="p-5 space-y-4">
                 {/* Feedback */}
                 {partyMsg && (
-                  <div className={`flex items-start gap-2.5 p-3 rounded-lg text-sm font-medium ${
-                    partyMsg.type === 'success'
-                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                      : 'bg-rose-50 border border-rose-200 text-rose-700'
-                  }`}>
+                  <div className={`flex items-start gap-2.5 p-3 rounded-lg text-sm font-medium ${partyMsg.type === 'success'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border border-rose-200 text-rose-700'
+                    }`}>
                     {partyMsg.type === 'success'
                       ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
                       : <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-500" />}
@@ -240,15 +248,14 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
                         key={pt.value}
                         type="button"
                         onClick={() => setPartyType(pt.value)}
-                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-lg border-2 text-center transition-all ${
-                          partyType === pt.value
-                            ? pt.color === 'blue'
-                              ? 'border-blue-500 bg-blue-50 text-blue-800'
-                              : pt.color === 'emerald'
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-lg border-2 text-center transition-all ${partyType === pt.value
+                          ? pt.color === 'blue'
+                            ? 'border-blue-500 bg-blue-50 text-blue-800'
+                            : pt.color === 'emerald'
                               ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
                               : 'border-purple-500 bg-purple-50 text-purple-800'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
                       >
                         <span className="font-bold text-xs">{pt.label}</span>
                         <span className="text-[10px] font-medium opacity-70 mt-0.5">{pt.desc}</span>
@@ -294,11 +301,10 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
                   <button
                     key={ft}
                     onClick={() => setFilterType(ft)}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition capitalize ${
-                      filterType === ft
-                        ? 'bg-slate-800 text-white'
-                        : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition capitalize ${filterType === ft
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}
                   >
                     {ft === 'all' ? 'All' : ft.charAt(0).toUpperCase() + ft.slice(1)}
                   </button>
@@ -307,7 +313,22 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
             </div>
 
             {/* Party Cards */}
-            {filteredParties.length === 0 ? (
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 animate-pulse">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-4 bg-slate-200 rounded w-24" />
+                        <div className="h-3 bg-slate-100 rounded w-16" />
+                      </div>
+                    </div>
+                    <div className="h-3 bg-slate-100 rounded w-32 mt-2" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredParties.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-14 bg-white border border-slate-200 rounded-xl text-center">
                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
                   <User className="w-6 h-6 text-slate-400" />
@@ -323,11 +344,10 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
                   <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                          p.party_type === 'supplier' ? 'bg-blue-100 text-blue-700' :
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${p.party_type === 'supplier' ? 'bg-blue-100 text-blue-700' :
                           p.party_type === 'buyer' ? 'bg-emerald-100 text-emerald-700' :
-                          'bg-purple-100 text-purple-700'
-                        }`}>
+                            'bg-purple-100 text-purple-700'
+                          }`}>
                           {p.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
@@ -392,11 +412,10 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
 
               <div className="p-5 space-y-4">
                 {cropMsg && (
-                  <div className={`flex items-start gap-2.5 p-3 rounded-lg text-sm font-medium ${
-                    cropMsg.type === 'success'
-                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                      : 'bg-rose-50 border border-rose-200 text-rose-700'
-                  }`}>
+                  <div className={`flex items-start gap-2.5 p-3 rounded-lg text-sm font-medium ${cropMsg.type === 'success'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border border-rose-200 text-rose-700'
+                    }`}>
                     {cropMsg.type === 'success'
                       ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
                       : <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-500" />}
@@ -491,7 +510,7 @@ export function PartiesClientPage({ initialParties, initialCrops }: PartiesClien
                                   </button>
                                 )}
                               </div>
-                              
+
                               <div className="flex flex-wrap gap-2">
                                 {(c.varieties || []).length === 0 && activeCropIdForVariety !== c.id && (
                                   <span className="text-xs text-slate-400 italic">No types added</span>

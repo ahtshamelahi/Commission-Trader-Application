@@ -12,6 +12,7 @@ interface DashboardStatCardProps {
   iconName: StatIconName;
   trend?: string;
   variant?: 'normal' | 'positive' | 'negative' | 'neutral';
+  isLoading?: boolean;
 }
 
 const iconMap = {
@@ -30,6 +31,7 @@ export function DashboardStatCard({
   iconName,
   trend,
   variant = 'normal',
+  isLoading = false,
 }: DashboardStatCardProps) {
   const Icon = iconMap[iconName] || HelpCircle;
 
@@ -47,10 +49,18 @@ export function DashboardStatCard({
         <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider">{title}</span>
       </div>
       <div className="mt-1 sm:mt-2 flex items-baseline gap-1.5">
-        <span className={`text-sm sm:text-lg font-bold tracking-tight ${valueClass}`}>{value}</span>
-        {unit && <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">{unit}</span>}
+        {isLoading ? (
+          <div className="h-5 w-24 bg-slate-200 rounded animate-pulse" />
+        ) : (
+          <span className={`text-sm sm:text-lg font-bold tracking-tight ${valueClass}`}>{value}</span>
+        )}
+        {!isLoading && unit && <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">{unit}</span>}
       </div>
-      {trend && <p className="mt-0.5 text-[9px] sm:text-[10px] text-slate-400">{trend}</p>}
+      {isLoading ? (
+        <div className="mt-1 h-3 w-16 bg-slate-100 rounded animate-pulse" />
+      ) : (
+        trend && <p className="mt-0.5 text-[9px] sm:text-[10px] text-slate-400">{trend}</p>
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ interface ReportsViewProps {
   sales: Sale[];
   expenses: Expense[];
   movements: StockMovement[];
+  isLoading?: boolean;
 }
 
 export function ReportsView({
@@ -31,6 +32,7 @@ export function ReportsView({
   sales,
   expenses,
   movements,
+  isLoading = false,
 }: ReportsViewProps) {
   const [activeTab, setActiveTab] = useState<'pnl' | 'purchases' | 'sales' | 'stock' | 'expenses'>('pnl');
   const [startDate, setStartDate] = useState<string>('');

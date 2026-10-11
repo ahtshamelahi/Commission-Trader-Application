@@ -80,6 +80,7 @@ export function MobileNavigation() {
                 <Link
                   key={item.name}
                   href={item.href}
+                  prefetch={true}
                   onClick={() => setIsOpen(false)}
                   className={`flex items-center gap-2 px-2.5 py-2 rounded-md text-sm font-medium transition-colors ${isActive
                     ? 'bg-emerald-700 text-white'

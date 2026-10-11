@@ -23,9 +23,10 @@ interface StockStatsCardsProps {
   varieties: CropVariety[];
   purchases: Purchase[];
   sales: Sale[];
+  isLoading?: boolean;
 }
 
-export function StockStatsCards({ crops, varieties, purchases, sales }: StockStatsCardsProps) {
+export function StockStatsCards({ crops, varieties, purchases, sales, isLoading = false }: StockStatsCardsProps) {
   const [selectedCropId, setSelectedCropId] = useState<number | 'all'>('all');
   const [selectedVarietyId, setSelectedVarietyId] = useState<number | 'all' | null>('all');
 
@@ -124,7 +125,17 @@ export function StockStatsCards({ crops, varieties, purchases, sales }: StockSta
       </div>
 
       {/* Stats Cards Grid */}
-      {filteredSummaries.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-sm p-3 shadow-2xs animate-pulse space-y-2">
+              <div className="h-4 bg-slate-200 rounded w-24" />
+              <div className="h-3 bg-slate-100 rounded w-16" />
+              <div className="h-6 bg-slate-200 rounded w-20 mt-2" />
+            </div>
+          ))}
+        </div>
+      ) : filteredSummaries.length === 0 ? (
         <div className="py-12 bg-white border border-dashed border-slate-300 rounded-xl text-center">
           <Sprout className="w-8 h-8 text-slate-300 mx-auto mb-2" />
           <p className="text-sm font-semibold text-slate-500">No stock data found for these filters.</p>

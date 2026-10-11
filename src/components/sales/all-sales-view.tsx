@@ -10,9 +10,10 @@ interface AllSalesViewProps {
   sales: Sale[];
   crops: Crop[];
   buyers: Party[];
+  isLoading?: boolean;
 }
 
-export function AllSalesView({ sales, crops, buyers }: AllSalesViewProps) {
+export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSalesViewProps) {
   const [cropFilter, setCropFilter] = useState<string>('all');
   const [buyerFilter, setBuyerFilter] = useState<string>('all');
   const [fromDate, setFromDate] = useState<string>('');
@@ -66,7 +67,11 @@ export function AllSalesView({ sales, crops, buyers }: AllSalesViewProps) {
           </div>
           <div>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Sales</p>
-            <p className="text-xl font-extrabold text-slate-900">{filtered.length}</p>
+            {isLoading ? (
+              <div className="h-6 w-16 bg-slate-200 rounded animate-pulse mt-1" />
+            ) : (
+              <p className="text-xl font-extrabold text-slate-900">{filtered.length}</p>
+            )}
           </div>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-4">
@@ -75,7 +80,11 @@ export function AllSalesView({ sales, crops, buyers }: AllSalesViewProps) {
           </div>
           <div>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Weight</p>
-            <p className="text-xl font-extrabold text-slate-900">{totalWeight.toLocaleString()} <span className="text-sm font-bold text-slate-500">kg</span></p>
+            {isLoading ? (
+              <div className="h-6 w-20 bg-slate-200 rounded animate-pulse mt-1" />
+            ) : (
+              <p className="text-xl font-extrabold text-slate-900">{totalWeight.toLocaleString()} <span className="text-sm font-bold text-slate-500">kg</span></p>
+            )}
           </div>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-4">
@@ -84,7 +93,11 @@ export function AllSalesView({ sales, crops, buyers }: AllSalesViewProps) {
           </div>
           <div>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Revenue</p>
-            <p className="text-xl font-extrabold text-emerald-800">Rs. {totalRevenue.toLocaleString()}</p>
+            {isLoading ? (
+              <div className="h-6 w-24 bg-slate-200 rounded animate-pulse mt-1" />
+            ) : (
+              <p className="text-xl font-extrabold text-emerald-800">Rs. {totalRevenue.toLocaleString()}</p>
+            )}
           </div>
         </div>
       </div>
@@ -158,7 +171,40 @@ export function AllSalesView({ sales, crops, buyers }: AllSalesViewProps) {
 
       {/* Sales Table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Invoice</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Crop</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Buyer</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Delivered (kg)</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Commission (kg)</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Billable (kg)</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Rate/40kg</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Sale Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-20" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-16" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-16" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-24" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-14 ml-auto" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-14 ml-auto" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-14 ml-auto" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-16 ml-auto" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-20 ml-auto" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
               <ReceiptText className="w-6 h-6 text-slate-400" />

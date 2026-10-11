@@ -24,9 +24,38 @@ export function ReusableDataTable<T extends { id?: string | number }>({
 }: ReusableDataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="w-full p-8 text-center bg-white border border-slate-200 rounded-md">
-        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
-        <p className="mt-2 text-sm text-slate-500">Loading data...</p>
+      <div className="w-full overflow-x-auto border border-slate-200 rounded-md bg-white shadow-2xs">
+        <table className="w-full text-left text-sm text-slate-700">
+          <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-600 tracking-wider">
+            <tr>
+              {columns.map((col, idx) => (
+                <th
+                  key={idx}
+                  className={`px-3 py-2 ${
+                    col.align === 'right'
+                      ? 'text-right'
+                      : col.align === 'center'
+                      ? 'text-center'
+                      : 'text-left'
+                  }`}
+                >
+                  {col.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {Array.from({ length: 5 }).map((_, rIdx) => (
+              <tr key={rIdx} className="animate-pulse">
+                {columns.map((_, cIdx) => (
+                  <td key={cIdx} className="px-3 py-2.5">
+                    <div className="h-3.5 bg-slate-200 rounded-sm w-3/4" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   }

@@ -65,6 +65,7 @@ export function SidebarNavigation() {
             <Link
               key={item.name}
               href={item.href}
+              prefetch={true}
               className={`flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isActive
                 ? 'bg-emerald-700 text-white shadow-xs'
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white'
