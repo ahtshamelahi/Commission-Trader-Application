@@ -9,7 +9,7 @@ import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 import { Purchase } from '@/types/purchase-data-types';
 
-import { connection } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export default async function PurchasesPage() {
   const supabase = getSupabaseServerClient();

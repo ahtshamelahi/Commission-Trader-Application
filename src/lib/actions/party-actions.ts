@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { PartyType } from '@/types/party-data-types';
+import { revalidatePath } from 'next/cache';
 
 export async function saveParty(input: {
   id?: number;
@@ -47,6 +48,12 @@ export async function saveParty(input: {
         .single();
 
       if (error) return { success: false, message: error.message };
+
+      revalidatePath('/purchases');
+      revalidatePath('/parties');
+      revalidatePath('/sales/new');
+      revalidatePath('/sales/all');
+
       return { success: true, data };
     }
   } catch (err: unknown) {

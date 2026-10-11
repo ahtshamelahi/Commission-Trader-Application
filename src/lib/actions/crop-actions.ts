@@ -2,6 +2,8 @@
 
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 
+import { revalidatePath } from 'next/cache';
+
 export async function saveCrop(name: string) {
   if (!name || name.trim() === '') {
     return { success: false, message: 'Crop name is required.' };
@@ -19,6 +21,11 @@ export async function saveCrop(name: string) {
     if (error) {
       return { success: false, message: error.message };
     }
+
+    revalidatePath('/purchases');
+    revalidatePath('/parties');
+    revalidatePath('/sales/new');
+    revalidatePath('/stock');
 
     return { success: true, data };
   } catch (err: unknown) {

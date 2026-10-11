@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { PosSaleForm } from '@/components/sales/pos-sale-form';
 import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
-import { connection } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export default async function NewSalePage() {
   const supabase = getSupabaseServerClient();

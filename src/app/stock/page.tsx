@@ -10,7 +10,7 @@ import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Purchase } from '@/types/purchase-data-types';
 import { Sale } from '@/types/sale-data-types';
 import { StockMovement } from '@/types/stock-data-types';
-import { connection } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export default async function StockPage() {
   const supabase = getSupabaseServerClient();

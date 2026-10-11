@@ -80,6 +80,10 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
   const [errorMsg, setErrorMsg] = useState('');
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
+  // Mobile tab state: 'items' (Crop & item entry) or 'cart' (Buyer & Cart & Finalize)
+  const [mobileTab, setMobileTab] = useState<'items' | 'cart'>('items');
+  const [justAddedMsg, setJustAddedMsg] = useState(false);
+
   const selectedBuyer = buyers.find((b) => b.id === selectedBuyerId) || null;
   const filteredBuyers = buyers.filter(
     (b) => b.name.toLowerCase().includes(buyerSearch.toLowerCase()) || (b.phone || '').includes(buyerSearch)
@@ -140,6 +144,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
     setItemWeight('');
     setItemRate('');
     setErrorMsg('');
+    setJustAddedMsg(true);
   };
 
   const handleRemoveFromCart = (key: string) => {
@@ -160,6 +165,8 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
     setExpenseNotes('');
     setInvoiceNotes('');
     setErrorMsg('');
+    setMobileTab('items');
+    setJustAddedMsg(false);
   };
 
   const handleFinalize = async () => {
@@ -310,11 +317,62 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
         }
       `}</style>
 
+      {/* ── Mobile Tab Navigation (Hidden on Desktop) ────── */}
+      <div className="lg:hidden flex border border-slate-200 rounded-lg p-1 bg-slate-100 gap-1 mt-2">
+        <button
+          type="button"
+          onClick={() => setMobileTab('items')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition ${
+            mobileTab === 'items'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Sprout className="w-3.5 h-3.5" />
+          <span>1. Select Crop & Enter ({crops.length} crops)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('cart')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition relative ${
+            mobileTab === 'cart'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Receipt className="w-3.5 h-3.5" />
+          <span>2. Cart & Finalize</span>
+          {cart.length > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1 ${
+              mobileTab === 'cart' ? 'bg-white text-emerald-700' : 'bg-emerald-600 text-white'
+            }`}>
+              {cart.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {justAddedMsg && (
+        <div className="lg:hidden flex items-center justify-between p-2.5 mt-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-medium">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Item added! ({cart.length} in cart)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileTab('cart')}
+            className="text-xs font-bold text-emerald-700 underline ml-2"
+          >
+            Go to Cart & Finalize →
+          </button>
+        </div>
+      )}
+
       {/* ── POS Layout ─────────────────────────────────────── */}
-      <div className="mt-3 flex gap-4 h-[calc(100vh-130px)] min-h-[600px]">
+      <div className="mt-3 flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-130px)] lg:min-h-[600px]">
 
         {/* ═══ LEFT: Buyer + Cart + Expense + Finalize ═════ */}
-        <div className="w-[360px] shrink-0 flex flex-col gap-2 overflow-y-auto pb-2">
+        <div className={`${mobileTab === 'cart' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[360px] lg:shrink-0 flex-col gap-2 overflow-y-auto pb-2`}>
 
           {/* Buyer */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
@@ -366,8 +424,15 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
             </div>
             <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
               {cart.length === 0 ? (
-                <div className="flex items-center justify-center py-8 text-center">
-                  <p className="text-xs text-slate-400">Select a crop on the right<br />and add items here</p>
+                <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                  <p className="text-xs text-slate-400 mb-2">No items added yet</p>
+                  <button
+                    type="button"
+                    onClick={() => setMobileTab('items')}
+                    className="lg:hidden text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-md border border-emerald-200"
+                  >
+                    ← Select Crop to Add
+                  </button>
                 </div>
               ) : (
                 cart.map((item) => (
@@ -449,11 +514,18 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
               className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm py-3 rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
               {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Saving...</> : `Finalize Sale (${cart.length} item${cart.length !== 1 ? 's' : ''})`}
             </button>
+            <button
+              type="button"
+              onClick={() => setMobileTab('items')}
+              className="lg:hidden w-full text-center text-xs font-semibold text-slate-600 hover:text-slate-900 py-1"
+            >
+              ← Back to Select Crops
+            </button>
           </div>
         </div>
 
         {/* ═══ RIGHT: Crop → Variety → Item Entry ═══════════ */}
-        <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+        <div className={`${mobileTab === 'items' ? 'flex' : 'hidden'} lg:flex flex-1 flex-col gap-2 overflow-y-auto lg:overflow-hidden pb-2`}>
 
           {/* Step 1: Crop selection */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">

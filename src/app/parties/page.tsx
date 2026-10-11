@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { PartiesClientPage } from '@/components/parties/parties-client-page';
 import { Party } from '@/types/party-data-types';
 import { Crop } from '@/types/crop-data-types';
-import { connection } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export default async function PartiesPage() {
   const supabase = getSupabaseServerClient();
