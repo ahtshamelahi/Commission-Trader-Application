@@ -43,6 +43,7 @@ interface ReceiptData {
   purchaseDate: string;
   supplierName: string;
   supplierPhone: string;
+  vehicleNumber: string;
   items: ReceiptItem[];
   expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
   totalCropAmount: number;
@@ -77,6 +78,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     { expense_type: '', amount: '', is_income: false, notes: '' },
   ]);
   const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
 
   // UI
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -161,6 +163,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     setCart([]);
     setExpenses([{ expense_type: '', amount: '', is_income: false, notes: '' }]);
     setInvoiceNotes('');
+    setVehicleNumber('');
     setErrorMsg('');
     setMobileTab('items');
     setJustAddedMsg(false);
@@ -179,6 +182,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
       supplier_id: selectedSupplierId,
       items: cart.map(({ _key, commissionWeightKg, bardanaWeightKg, netWeightKg, cropAmountPkr, ...item }) => item),
       expenses: validExpenses,
+      vehicle_number: vehicleNumber || undefined,
       notes: invoiceNotes,
     });
 
@@ -193,6 +197,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
         }),
         supplierName: selectedSupplier?.name || 'Unknown Supplier',
         supplierPhone: selectedSupplier?.phone || '',
+        vehicleNumber: vehicleNumber || '',
         items: cart.map((i) => ({
           cropName: i.crop_name || '—',
           varietyName: i.variety_name || '',
@@ -253,6 +258,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Supplier</p>
                 <p className="font-bold text-sm">{receipt.supplierName}</p>
                 {receipt.supplierPhone && <p className="text-slate-500 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{receipt.supplierPhone}</p>}
+                {receipt.vehicleNumber && <p className="text-slate-700 font-semibold flex items-center gap-1 mt-0.5">🚛 Vehicle: <span className="font-bold tracking-wide">{receipt.vehicleNumber}</span></p>}
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items</p>
@@ -505,9 +511,14 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
 
           {/* Notes + Finalize */}
           <div className="shrink-0 space-y-2">
-            <input type="text" placeholder="Invoice notes (optional)" value={invoiceNotes}
-              onChange={(e) => setInvoiceNotes(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <div className="flex gap-2">
+              <input type="text" placeholder="Vehicle number (e.g. LEA-123)" value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" placeholder="Invoice notes (optional)" value={invoiceNotes}
+                onChange={(e) => setInvoiceNotes(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
             {cart.length > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between">
                 <div>

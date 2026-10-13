@@ -79,7 +79,7 @@ export default function LoginPage() {
                 <Store className="h-7 w-7 text-white" />
               </div>
               <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
-                M-Shafiq Commission Traders
+                M-Shafiq Commission Shop
               </h1>
               <p className="mt-1 text-sm text-slate-500">Sign in to your account to continue</p>
             </div>

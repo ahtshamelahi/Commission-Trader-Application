@@ -18,9 +18,10 @@ const SHOP_NAME = 'M Shafiq Commission Shop';
 type TradeKind = 'sales' | 'purchases';
 
 interface TradeReportRow {
-  date: string; // YYYY-MM-DD
-  party: string; // buyer (sales) or seller (purchases)
-  ref: string; // id / bill number
+  date: string;
+  party: string;
+  ref: string;
+  vehicleNumber: string;
   totalWeight: number;
   commissionWeight: number;
   pricePerMaund: number;
@@ -79,9 +80,10 @@ function buildTradeReportPdf(opts: {
     'Date',
     `${partyLabel} Name`,
     'ID',
+    'Vehicle No.',
     'Total Weight (kg)',
-    'Commission Weight (kg)',
-    'Price / Maund (40 kg)',
+    'Commission (kg)',
+    'Price / Maund',
     'Total Price',
     ...(showExpenses ? ['Expenses'] : []),
   ];
@@ -90,6 +92,7 @@ function buildTradeReportPdf(opts: {
     prettyDate(r.date),
     r.party,
     r.ref,
+    r.vehicleNumber || '—',
     nf(r.totalWeight),
     nf(r.commissionWeight),
     nf(r.pricePerMaund),
@@ -172,11 +175,12 @@ function normalizeSales(rows: Sale[]): TradeReportRow[] {
       date: toISODate(r.created_at),
       party: partyName(r.parties),
       ref: r.invoice_no ?? String(r.id),
+      vehicleNumber: r.vehicle_number || '',
       totalWeight: toNum(r.physical_weight_kg),
       commissionWeight: toNum(r.commission_weight_kg),
       pricePerMaund: toNum(r.rate_per_40kg),
       totalPrice: toNum(r.sale_amount),
-      expenses: 0, // sales have no expense column
+      expenses: 0,
     }))
     .sort(byDate);
 }
@@ -187,6 +191,7 @@ function normalizePurchases(rows: Purchase[]): TradeReportRow[] {
       date: toISODate(r.created_at),
       party: partyName(r.parties),
       ref: r.invoice_no ?? String(r.id),
+      vehicleNumber: r.vehicle_number || '',
       totalWeight: toNum(r.gross_weight_kg),
       commissionWeight: toNum(r.commission_weight_kg),
       pricePerMaund: toNum(r.rate_per_40kg),

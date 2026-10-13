@@ -46,6 +46,7 @@ interface ReceiptData {
   saleDate: string;
   buyerName: string;
   buyerPhone: string;
+  vehicleNumber: string;
   items: ReceiptItem[];
   expenseAmount: number;
   expenseNotes: string;
@@ -78,6 +79,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseNotes, setExpenseNotes] = useState('');
   const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -175,6 +177,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
     setExpenseAmount('');
     setExpenseNotes('');
     setInvoiceNotes('');
+    setVehicleNumber('');
     setErrorMsg('');
     setMobileTab('items');
     setJustAddedMsg(false);
@@ -190,6 +193,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
       items: cart.map(({ _key, commissionWeightKg, bardanaWeightKg, billableWeightKg, saleAmountPkr, ...item }) => item),
       expense_amount: Number(expenseAmount) || 0,
       expense_notes: expenseNotes,
+      vehicle_number: vehicleNumber || undefined,
       notes: invoiceNotes,
     });
 
@@ -204,6 +208,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
         }),
         buyerName: selectedBuyer?.name || 'Walk-in / Unknown',
         buyerPhone: selectedBuyer?.phone || '',
+        vehicleNumber: vehicleNumber || '',
         items: cart.map((i) => ({
           cropName: i.crop_name || '—',
           varietyName: i.variety_name || '',
@@ -264,6 +269,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Buyer</p>
                 <p className="font-bold text-sm">{receipt.buyerName}</p>
                 {receipt.buyerPhone && <p className="text-slate-500 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{receipt.buyerPhone}</p>}
+                {receipt.vehicleNumber && <p className="text-slate-700 font-semibold flex items-center gap-1 mt-0.5">🚛 Vehicle: <span className="font-bold tracking-wide">{receipt.vehicleNumber}</span></p>}
               </div>
 
               {/* Line items */}
@@ -481,6 +487,12 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
             </div>
             <div className="px-3 py-3 space-y-2">
               <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Vehicle No.</label>
+                  <input type="text" placeholder="e.g. LEA-123" value={vehicleNumber}
+                    onChange={(e) => setVehicleNumber(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                </div>
                 <div className="flex-1">
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Amount (PKR)</label>
                   <input type="number" step="1" min="0" placeholder="0" value={expenseAmount}
