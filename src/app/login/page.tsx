@@ -79,7 +79,7 @@ export default function LoginPage() {
                 <Store className="h-7 w-7 text-white" />
               </div>
               <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
-                Al-Shafiq Commission Traders
+                M-Shafiq Commission Traders
               </h1>
               <p className="mt-1 text-sm text-slate-500">Sign in to your account to continue</p>
             </div>
@@ -152,7 +152,7 @@ export default function LoginPage() {
                 <rect x="0" y="8" width="124" height="62" rx="5" fill="#059669" />
                 <rect x="0" y="8" width="124" height="8" rx="4" fill="#047857" />
                 <text x="62" y="46" textAnchor="middle" fontSize="13" fontWeight="800" fill="#ecfdf5" fontFamily="sans-serif">
-                  AL-SHAFIQ
+                  M-SHAFIQ
                 </text>
                 {/* cab */}
                 <path d="M128 70 V30 a6 6 0 0 1 6 -6 h28 q8 0 13 8 l14 20 a8 8 0 0 1 1.5 4.5 V70 Z" fill="#f8fafc" />
