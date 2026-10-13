@@ -19,6 +19,7 @@ interface PurchaseEntryFormProps {
 interface CartItem extends MultiPurchaseItem {
   _key: string;
   commissionWeightKg: number;
+  bardanaWeightKg: number;
   netWeightKg: number;
   cropAmountPkr: number;
 }
@@ -30,6 +31,8 @@ interface ReceiptItem {
   grossWeightKg: number;
   commissionPer40kg: number;
   commissionWeightKg: number;
+  bardanaPerBagKg: number;
+  bardanaWeightKg: number;
   netWeightKg: number;
   ratePer40kg: number;
   cropAmountPkr: number;
@@ -64,6 +67,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
   const [itemGrossWeight, setItemGrossWeight] = useState('');
   const [itemCommission, setItemCommission] = useState('1.5');
   const [itemRate, setItemRate] = useState('');
+  const [itemBardana, setItemBardana] = useState('');
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -96,7 +100,9 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
   const liveCalc = performPurchaseCalculations(
     Number(itemGrossWeight) || 0,
     Number(itemCommission) || 0,
-    Number(itemRate) || 0
+    Number(itemRate) || 0,
+    Number(itemBags) || 0,
+    Number(itemBardana) || 0
   );
 
   const cartTotal = cart.reduce((s, i) => s + i.cropAmountPkr, 0);
@@ -114,7 +120,9 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     const calc = performPurchaseCalculations(
       Number(itemGrossWeight),
       Number(itemCommission) || 0,
-      Number(itemRate)
+      Number(itemRate),
+      Number(itemBags) || 0,
+      Number(itemBardana) || 0
     );
     setCart((prev) => [...prev, {
       _key: `${Date.now()}`,
@@ -126,13 +134,16 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
       gross_weight_kg: Number(itemGrossWeight),
       commission_per_40kg: Number(itemCommission) || 0,
       rate_per_40kg: Number(itemRate),
+      bardana_per_bag_kg: Number(itemBardana) || 0,
       commissionWeightKg: calc.commissionWeightKg,
+      bardanaWeightKg: calc.bardanaWeightKg,
       netWeightKg: calc.netWeightKg,
       cropAmountPkr: calc.cropAmountPkr,
     }]);
     setItemBags('');
     setItemGrossWeight('');
     setItemRate('');
+    setItemBardana('');
     setErrorMsg('');
     setJustAddedMsg(true);
   };
@@ -146,6 +157,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     setItemGrossWeight('');
     setItemCommission('1.5');
     setItemRate('');
+    setItemBardana('');
     setCart([]);
     setExpenses([{ expense_type: '', amount: '', is_income: false, notes: '' }]);
     setInvoiceNotes('');
@@ -165,7 +177,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
 
     const res = await saveMultiPurchaseTransaction({
       supplier_id: selectedSupplierId,
-      items: cart.map(({ _key, commissionWeightKg, netWeightKg, cropAmountPkr, ...item }) => item),
+      items: cart.map(({ _key, commissionWeightKg, bardanaWeightKg, netWeightKg, cropAmountPkr, ...item }) => item),
       expenses: validExpenses,
       notes: invoiceNotes,
     });
@@ -188,6 +200,8 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
           grossWeightKg: i.gross_weight_kg,
           commissionPer40kg: i.commission_per_40kg,
           commissionWeightKg: i.commissionWeightKg,
+          bardanaPerBagKg: i.bardana_per_bag_kg || 0,
+          bardanaWeightKg: i.bardanaWeightKg,
           netWeightKg: i.netWeightKg,
           ratePer40kg: i.rate_per_40kg,
           cropAmountPkr: i.cropAmountPkr,
@@ -253,7 +267,8 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                         {item.bags > 0 && <tr><td>Bags</td><td className="text-right font-semibold">{item.bags}</td></tr>}
                         <tr><td>Gross Weight</td><td className="text-right font-semibold">{item.grossWeightKg.toLocaleString()} kg</td></tr>
                         <tr><td>Commission ({item.commissionPer40kg} kg/40kg)</td><td className="text-right text-rose-600">−{item.commissionWeightKg} kg</td></tr>
-                        <tr><td className="text-emerald-700 font-semibold">Net Weight (Stock)</td><td className="text-right text-emerald-700 font-bold">{item.netWeightKg.toLocaleString()} kg</td></tr>
+                        {item.bardanaWeightKg > 0 && <tr><td>Bardana ({item.bardanaPerBagKg} kg × {item.bags} bags)</td><td className="text-right text-amber-600">−{item.bardanaWeightKg} kg</td></tr>}
+                        <tr><td className="text-emerald-700 font-semibold">Net Weight (Payable)</td><td className="text-right text-emerald-700 font-bold">{item.netWeightKg.toLocaleString()} kg</td></tr>
                         <tr><td>Rate / 40 kg</td><td className="text-right">Rs. {item.ratePer40kg.toLocaleString()}</td></tr>
                       </tbody>
                     </table>
@@ -600,7 +615,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                 </span>
               </div>
               <div className="px-4 py-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Bags</label>
                     <input type="number" step="1" min="0" placeholder="0" value={itemBags}
@@ -615,7 +630,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Commission / 40 kg (kg)</label>
-                    <input type="number" step="1.5" min="0" value={itemCommission}
+                    <input type="number" step="0.5" min="0" value={itemCommission}
                       onChange={(e) => setItemCommission(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
@@ -625,13 +640,20 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                       onChange={(e) => setItemRate(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Bardana / Bag (kg)</label>
+                    <input type="number" step="0.1" min="0" placeholder="e.g. 0.5" value={itemBardana}
+                      onChange={(e) => setItemBardana(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
                 </div>
 
                 {Number(itemGrossWeight) > 0 && Number(itemRate) > 0 && (
-                  <div className="flex items-center gap-3 text-xs mb-3 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                  <div className="flex flex-wrap items-center gap-3 text-xs mb-3 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
                     <span className="text-slate-500">Comm: <strong className="text-rose-600">−{liveCalc.commissionWeightKg} kg</strong></span>
+                    {liveCalc.bardanaWeightKg > 0 && <><span className="text-slate-300">|</span><span className="text-slate-500">Bardana: <strong className="text-amber-600">−{liveCalc.bardanaWeightKg} kg</strong></span></>}
                     <span className="text-slate-300">|</span>
-                    <span className="text-slate-500">Net Stock: <strong className="text-emerald-700">+{liveCalc.netWeightKg} kg</strong></span>
+                    <span className="text-slate-500">Net: <strong className="text-emerald-700">+{liveCalc.netWeightKg} kg</strong></span>
                     <span className="text-slate-300">|</span>
                     <span className="text-slate-500">Amount: <strong className="text-blue-800">Rs. {liveCalc.cropAmountPkr.toLocaleString()}</strong></span>
                   </div>

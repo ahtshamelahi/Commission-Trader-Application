@@ -12,6 +12,7 @@ export interface MultiSaleItem {
   bags: number;
   physical_weight_kg: number;
   commission_per_40kg: number;
+  bardana_per_bag_kg: number;
   rate_per_40kg: number;
 }
 
@@ -20,6 +21,7 @@ export interface MultiSaleInput {
   items: MultiSaleItem[];
   expense_amount: number;
   expense_notes?: string;
+  vehicle_number?: string;
   notes?: string;
 }
 
@@ -65,7 +67,9 @@ export async function saveMultiSaleTransaction(input: MultiSaleInput) {
       const calc = performSaleCalculations(
         item.physical_weight_kg,
         item.commission_per_40kg,
-        item.rate_per_40kg
+        item.rate_per_40kg,
+        item.bags || 0,
+        item.bardana_per_bag_kg || 0
       );
 
       const itemInvoiceNo = input.items.length > 1 ? `${invoiceNo}-${itemIndex}` : invoiceNo;
@@ -81,9 +85,12 @@ export async function saveMultiSaleTransaction(input: MultiSaleInput) {
           physical_weight_kg: item.physical_weight_kg,
           commission_per_40kg: item.commission_per_40kg,
           commission_weight_kg: calc.commissionWeightKg,
+          bardana_per_bag_kg: item.bardana_per_bag_kg || 0,
+          bardana_total_kg: calc.bardanaWeightKg,
           billable_weight_kg: calc.billableWeightKg,
           rate_per_40kg: item.rate_per_40kg,
           sale_amount: calc.saleAmountPkr,
+          vehicle_number: input.vehicle_number || null,
           notes: input.notes || null,
         })
         .select('id')

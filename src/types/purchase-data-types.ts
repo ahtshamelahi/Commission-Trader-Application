@@ -18,9 +18,12 @@ export interface Purchase {
   gross_weight_kg: number;
   commission_per_40kg: number;
   commission_weight_kg: number;
+  bardana_per_bag_kg: number;
+  bardana_total_kg: number;
   net_weight_kg: number;
   rate_per_40kg: number;
   crop_amount: number;
+  vehicle_number: string | null;
   notes: string | null;
   created_at: string;
   crops?: Crop;
@@ -34,7 +37,9 @@ export interface NewPurchaseInput {
   bags: number;
   gross_weight_kg: number;
   commission_per_40kg: number;
+  bardana_per_bag_kg?: number;
   rate_per_40kg: number;
+  vehicle_number?: string;
   notes?: string;
   expenses?: { expense_type: string; amount: number; notes?: string }[];
 }

@@ -36,9 +36,13 @@ interface ReceiptData {
   cropName: string;
   buyerName: string;
   buyerPhone: string;
+  vehicleNumber: string;
   physicalWeightKg: number;
+  bags: number;
   commissionPer40kg: number;
   commissionWeightKg: number;
+  bardanaPerBagKg: number;
+  bardanaWeightKg: number;
   billableWeightKg: number;
   ratePer40kg: number;
   saleAmountPkr: number;
@@ -55,8 +59,11 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
   const [cropId, setCropId] = useState<string>('');
   const [buyerId, setBuyerId] = useState<string>('');
   const [physicalWeightKg, setPhysicalWeightKg] = useState<number | ''>('');
+  const [bags, setBags] = useState<number | ''>('');
+  const [bardanaPerBagKg, setBardanaPerBagKg] = useState<number | ''>('');
   const [commissionPer40kg, setCommissionPer40kg] = useState<number | ''>(1.5);
   const [ratePer40kg, setRatePer40kg] = useState<number | ''>('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
   const [notes, setNotes] = useState<string>('');
 
   // Expenses
@@ -82,7 +89,9 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
   const calculations = performSaleCalculations(
     Number(physicalWeightKg) || 0,
     Number(commissionPer40kg) || 0,
-    Number(ratePer40kg) || 0
+    Number(ratePer40kg) || 0,
+    Number(bags) || 0,
+    Number(bardanaPerBagKg) || 0
   );
 
   const isStockInsufficient = Number(physicalWeightKg || 0) > availableStockKg && !!cropId;
@@ -100,8 +109,11 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
     setCropId('');
     setBuyerId('');
     setPhysicalWeightKg('');
+    setBags('');
+    setBardanaPerBagKg('');
     setCommissionPer40kg(1.5);
     setRatePer40kg('');
+    setVehicleNumber('');
     setNotes('');
     setExpenses([{ expense_type: '', amount: '', is_income: false, notes: '' }]);
     setErrorMsg('');
@@ -137,8 +149,11 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
       crop_id: Number(cropId),
       buyer_id: buyerId ? Number(buyerId) : null,
       physical_weight_kg: Number(physicalWeightKg) || 0,
+      bags: Number(bags) || 0,
+      bardana_per_bag_kg: Number(bardanaPerBagKg) || 0,
       commission_per_40kg: Number(commissionPer40kg) || 0,
       rate_per_40kg: Number(ratePer40kg) || 0,
+      vehicle_number: vehicleNumber || undefined,
       notes,
       expenses: validExpenses,
     });
@@ -164,9 +179,13 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
         cropName: crop?.name || '—',
         buyerName: buyer?.name || 'Walk-in / Unknown',
         buyerPhone: buyer?.phone || '',
+        vehicleNumber: vehicleNumber || '',
         physicalWeightKg: Number(physicalWeightKg) || 0,
+        bags: Number(bags) || 0,
         commissionPer40kg: Number(commissionPer40kg) || 0,
         commissionWeightKg: calculations.commissionWeightKg,
+        bardanaPerBagKg: Number(bardanaPerBagKg) || 0,
+        bardanaWeightKg: calculations.bardanaWeightKg,
         billableWeightKg: calculations.billableWeightKg,
         ratePer40kg: Number(ratePer40kg) || 0,
         saleAmountPkr: calculations.saleAmountPkr,
@@ -289,6 +308,11 @@ This is a computer-generated receipt.
                   {receipt.buyerPhone && (
                     <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><Phone className="w-3 h-3" />{receipt.buyerPhone}</p>
                   )}
+                  {receipt.vehicleNumber && (
+                    <p className="text-xs text-slate-700 mt-1 font-semibold flex items-center gap-1">
+                      🚛 Vehicle: <span className="font-bold tracking-wide">{receipt.vehicleNumber}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Sale Breakdown Table */}
@@ -312,6 +336,12 @@ This is a computer-generated receipt.
                           − {receipt.commissionWeightKg.toLocaleString()} kg
                         </td>
                       </tr>
+                      {receipt.bardanaWeightKg > 0 && (
+                        <tr>
+                          <td className="py-1.5 text-slate-600 font-medium">Bardana ({receipt.bardanaPerBagKg} kg × {receipt.bags} bags)</td>
+                          <td className="py-1.5 font-semibold text-right text-amber-600">− {receipt.bardanaWeightKg.toLocaleString()} kg</td>
+                        </tr>
+                      )}
                       <tr className="bg-blue-50">
                         <td className="py-1.5 px-1 text-blue-700 font-bold rounded-l">Billable Weight</td>
                         <td className="py-1.5 px-1 font-bold text-right text-blue-800 rounded-r">
@@ -476,7 +506,25 @@ This is a computer-generated receipt.
             />
 
             <TextInputField
-              label="Commission Deduction per 40 kg (kg)"
+              label="Bags"
+              type="number"
+              step="1"
+              min="0"
+              value={bags}
+              onChange={(e) => setBags(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+
+            <TextInputField
+              label="Bardana / Bag (kg)"
+              type="number"
+              step="0.1"
+              min="0"
+              value={bardanaPerBagKg}
+              onChange={(e) => setBardanaPerBagKg(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+
+            <TextInputField
+              label="Commission per 40 kg (kg)"
               type="number"
               step="0.05"
               min="0"
@@ -509,6 +557,12 @@ This is a computer-generated receipt.
                 <span className="text-[11px] text-slate-500 uppercase block">Commission</span>
                 <span className="text-base font-bold text-rose-600">−{calculations.commissionWeightKg} kg</span>
               </div>
+              {calculations.bardanaWeightKg > 0 && (
+                <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                  <span className="text-[11px] text-slate-500 uppercase block">Bardana</span>
+                  <span className="text-base font-bold text-amber-600">−{calculations.bardanaWeightKg} kg</span>
+                </div>
+              )}
               <div className="bg-white p-2.5 rounded-lg border border-blue-200">
                 <span className="text-[11px] text-slate-500 uppercase block">Billable</span>
                 <span className="text-base font-bold text-blue-700">{calculations.billableWeightKg} kg</span>
@@ -604,12 +658,20 @@ This is a computer-generated receipt.
             </div>
           )}
 
-          <TextInputField
-            label="Additional Notes / Delivery Instructions"
-            placeholder="e.g. Delivered to Mill A, Gate Pass # 849"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <TextInputField
+              label="Vehicle Number (optional)"
+              placeholder="e.g. LEA-123, PES-9988"
+              value={vehicleNumber}
+              onChange={(e) => setVehicleNumber(e.target.value)}
+            />
+            <TextInputField
+              label="Additional Notes / Delivery Instructions"
+              placeholder="e.g. Delivered to Mill A, Gate Pass # 849"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
 
           <div className="flex justify-end pt-2">
             <button

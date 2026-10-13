@@ -22,6 +22,7 @@ interface PosSaleFormProps {
 interface CartItem extends MultiSaleItem {
   _key: string;
   commissionWeightKg: number;
+  bardanaWeightKg: number;
   billableWeightKg: number;
   saleAmountPkr: number;
 }
@@ -33,6 +34,8 @@ interface ReceiptItem {
   physicalWeightKg: number;
   commissionPer40kg: number;
   commissionWeightKg: number;
+  bardanaPerBagKg: number;
+  bardanaWeightKg: number;
   billableWeightKg: number;
   ratePer40kg: number;
   saleAmountPkr: number;
@@ -64,7 +67,8 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
   // Item entry fields
   const [itemBags, setItemBags] = useState('');
   const [itemWeight, setItemWeight] = useState('');
-  const [itemCommission, setItemCommission] = useState('1');
+  const [itemCommission, setItemCommission] = useState('1.5');
+  const [itemBardana, setItemBardana] = useState('');
   const [itemRate, setItemRate] = useState('');
 
   // Cart
@@ -106,7 +110,9 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
   const liveCalc = performSaleCalculations(
     Number(itemWeight) || 0,
     Number(itemCommission) || 0,
-    Number(itemRate) || 0
+    Number(itemRate) || 0,
+    Number(itemBags) || 0,
+    Number(itemBardana) || 0
   );
 
   const cartTotal = cart.reduce((s, i) => s + i.saleAmountPkr, 0);
@@ -122,7 +128,9 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
     const calc = performSaleCalculations(
       Number(itemWeight),
       Number(itemCommission) || 0,
-      Number(itemRate)
+      Number(itemRate),
+      Number(itemBags) || 0,
+      Number(itemBardana) || 0
     );
     const item: CartItem = {
       _key: `${Date.now()}`,
@@ -133,15 +141,17 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
       bags: Number(itemBags) || 0,
       physical_weight_kg: Number(itemWeight),
       commission_per_40kg: Number(itemCommission) || 0,
+      bardana_per_bag_kg: Number(itemBardana) || 0,
       rate_per_40kg: Number(itemRate),
       commissionWeightKg: calc.commissionWeightKg,
+      bardanaWeightKg: calc.bardanaWeightKg,
       billableWeightKg: calc.billableWeightKg,
       saleAmountPkr: calc.saleAmountPkr,
     };
     setCart((prev) => [...prev, item]);
-    // Reset item fields, keep crop/variety selection for next item
     setItemBags('');
     setItemWeight('');
+    setItemBardana('');
     setItemRate('');
     setErrorMsg('');
     setJustAddedMsg(true);
@@ -158,7 +168,8 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
     setPickedVarietyId(null);
     setItemBags('');
     setItemWeight('');
-    setItemCommission('1');
+    setItemCommission('1.5');
+    setItemBardana('');
     setItemRate('');
     setCart([]);
     setExpenseAmount('');
@@ -176,7 +187,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
 
     const res = await saveMultiSaleTransaction({
       buyer_id: selectedBuyerId,
-      items: cart.map(({ _key, commissionWeightKg, billableWeightKg, saleAmountPkr, ...item }) => item),
+      items: cart.map(({ _key, commissionWeightKg, bardanaWeightKg, billableWeightKg, saleAmountPkr, ...item }) => item),
       expense_amount: Number(expenseAmount) || 0,
       expense_notes: expenseNotes,
       notes: invoiceNotes,
@@ -200,6 +211,8 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
           physicalWeightKg: i.physical_weight_kg,
           commissionPer40kg: i.commission_per_40kg,
           commissionWeightKg: i.commissionWeightKg,
+          bardanaPerBagKg: i.bardana_per_bag_kg || 0,
+          bardanaWeightKg: i.bardanaWeightKg,
           billableWeightKg: i.billableWeightKg,
           ratePer40kg: i.rate_per_40kg,
           saleAmountPkr: i.saleAmountPkr,
@@ -269,6 +282,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
                         {item.bags > 0 && <tr><td>Bags</td><td className="text-right font-semibold">{item.bags}</td></tr>}
                         <tr><td>Delivered</td><td className="text-right font-semibold">{item.physicalWeightKg.toLocaleString()} kg</td></tr>
                         <tr><td>Commission ({item.commissionPer40kg} kg/40kg)</td><td className="text-right text-rose-600">−{item.commissionWeightKg} kg</td></tr>
+                        {item.bardanaWeightKg > 0 && <tr><td>Bardana ({item.bardanaPerBagKg} kg × {item.bags} bags)</td><td className="text-right text-amber-600">−{item.bardanaWeightKg} kg</td></tr>}
                         <tr><td className="text-blue-700 font-semibold">Billable</td><td className="text-right text-blue-700 font-bold">{item.billableWeightKg.toLocaleString()} kg</td></tr>
                         <tr><td>Rate / 40 kg</td><td className="text-right">Rs. {item.ratePer40kg.toLocaleString()}</td></tr>
                       </tbody>
@@ -624,7 +638,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
                 </span>
               </div>
               <div className="px-4 py-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Bags</label>
                     <input type="number" step="1" min="0" placeholder="0"
@@ -641,7 +655,7 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Commission / 40 kg (kg)</label>
-                    <input type="number" step="1" min="0"
+                    <input type="number" step="0.5" min="0"
                       value={itemCommission} onChange={(e) => setItemCommission(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
@@ -653,12 +667,19 @@ export function PosSaleForm({ crops, buyers, purchases, sales }: PosSaleFormProp
                       value={itemRate} onChange={(e) => setItemRate(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Bardana / Bag (kg)</label>
+                    <input type="number" step="0.1" min="0" placeholder="e.g. 0.5"
+                      value={itemBardana} onChange={(e) => setItemBardana(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </div>
                 </div>
 
                 {/* Mini calc preview */}
                 {Number(itemWeight) > 0 && Number(itemRate) > 0 && (
-                  <div className="flex items-center gap-3 text-xs mb-3 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                  <div className="flex flex-wrap items-center gap-3 text-xs mb-3 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
                     <span className="text-slate-500">Comm: <strong className="text-rose-600">−{liveCalc.commissionWeightKg} kg</strong></span>
+                    {liveCalc.bardanaWeightKg > 0 && <><span className="text-slate-300">|</span><span className="text-slate-500">Bardana: <strong className="text-amber-600">−{liveCalc.bardanaWeightKg} kg</strong></span></>}
                     <span className="text-slate-300">|</span>
                     <span className="text-slate-500">Billable: <strong className="text-blue-700">{liveCalc.billableWeightKg} kg</strong></span>
                     <span className="text-slate-300">|</span>

@@ -14,12 +14,14 @@ export interface MultiPurchaseItem {
   gross_weight_kg: number;
   commission_per_40kg: number;
   rate_per_40kg: number;
+  bardana_per_bag_kg: number;
 }
 
 export interface MultiPurchaseInput {
   supplier_id: number | null;
   items: MultiPurchaseItem[];
   expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
+  vehicle_number?: string;
   notes?: string;
 }
 
@@ -39,7 +41,9 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
       const calc = performPurchaseCalculations(
         item.gross_weight_kg,
         item.commission_per_40kg,
-        item.rate_per_40kg
+        item.rate_per_40kg,
+        item.bags || 0,
+        item.bardana_per_bag_kg || 0
       );
 
       const itemInvoiceNo = input.items.length > 1 ? `${invoiceNo}-${itemIndex}` : invoiceNo;
@@ -55,9 +59,12 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
           gross_weight_kg: item.gross_weight_kg,
           commission_per_40kg: item.commission_per_40kg,
           commission_weight_kg: calc.commissionWeightKg,
+          bardana_per_bag_kg: item.bardana_per_bag_kg || 0,
+          bardana_total_kg: calc.bardanaWeightKg,
           net_weight_kg: calc.netWeightKg,
           rate_per_40kg: item.rate_per_40kg,
           crop_amount: calc.cropAmountPkr,
+          vehicle_number: input.vehicle_number || null,
           notes: input.notes || null,
         })
         .select('id')

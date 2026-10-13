@@ -7,12 +7,16 @@ export interface Sale {
   crop_id: number;
   variety_id: number | null;
   buyer_id: number | null;
+  bags: number;
   physical_weight_kg: number;
   commission_per_40kg: number;
   commission_weight_kg: number;
+  bardana_per_bag_kg: number;
+  bardana_total_kg: number;
   billable_weight_kg: number;
   rate_per_40kg: number;
   sale_amount: number;
+  vehicle_number: string | null;
   notes: string | null;
   created_at: string;
   crops?: Crop;
@@ -23,7 +27,10 @@ export interface NewSaleInput {
   crop_id: number;
   buyer_id: number | null;
   physical_weight_kg: number;
+  bags?: number;
+  bardana_per_bag_kg?: number;
   commission_per_40kg: number;
   rate_per_40kg: number;
+  vehicle_number?: string;
   notes?: string;
 }

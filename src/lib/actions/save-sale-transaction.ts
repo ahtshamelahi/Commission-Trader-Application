@@ -14,6 +14,9 @@ export interface SaleExpenseInput {
 }
 
 export interface NewSaleWithExpensesInput extends NewSaleInput {
+  bags?: number;
+  bardana_per_bag_kg?: number;
+  vehicle_number?: string;
   expenses?: SaleExpenseInput[];
 }
 
@@ -40,7 +43,9 @@ export async function saveSaleTransaction(input: NewSaleWithExpensesInput) {
   const calculations = performSaleCalculations(
     input.physical_weight_kg,
     input.commission_per_40kg,
-    input.rate_per_40kg
+    input.rate_per_40kg,
+    input.bags || 0,
+    input.bardana_per_bag_kg || 0
   );
 
   const validExpenses = (input.expenses || []).filter((e) => Number(e.amount) > 0);
@@ -76,11 +81,15 @@ export async function saveSaleTransaction(input: NewSaleWithExpensesInput) {
         crop_id: input.crop_id,
         buyer_id: input.buyer_id || null,
         physical_weight_kg: input.physical_weight_kg,
+        bags: input.bags || 0,
         commission_per_40kg: input.commission_per_40kg,
         commission_weight_kg: calculations.commissionWeightKg,
+        bardana_per_bag_kg: input.bardana_per_bag_kg || 0,
+        bardana_total_kg: calculations.bardanaWeightKg,
         billable_weight_kg: calculations.billableWeightKg,
         rate_per_40kg: input.rate_per_40kg,
         sale_amount: calculations.saleAmountPkr,
+        vehicle_number: input.vehicle_number || null,
         notes: input.notes || null,
       })
       .select('id, invoice_no')
