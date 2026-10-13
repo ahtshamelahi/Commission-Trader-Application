@@ -9,7 +9,7 @@ import { Party } from '@/types/party-data-types';
 import { StockMovement } from '@/types/stock-data-types';
 import { calculateAvailableStock } from '@/lib/calculations/current-stock-calculation';
 import { performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
-import { saveSaleTransaction } from '@/lib/actions/save-sale-transaction';
+import { saveSaleTransaction, SaleExpenseInput } from '@/lib/actions/save-sale-transaction';
 import {
   Calculator,
   AlertCircle,
@@ -19,6 +19,8 @@ import {
   CheckCircle2,
   Store,
   Loader2,
+  Plus,
+  Phone,
 } from 'lucide-react';
 
 interface SaleEntryFormProps {
@@ -40,6 +42,8 @@ interface ReceiptData {
   billableWeightKg: number;
   ratePer40kg: number;
   saleAmountPkr: number;
+  expenses: SaleExpenseInput[];
+  totalExpensesNet: number;
   notes: string;
 }
 
@@ -51,9 +55,14 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
   const [cropId, setCropId] = useState<string>('');
   const [buyerId, setBuyerId] = useState<string>('');
   const [physicalWeightKg, setPhysicalWeightKg] = useState<number | ''>('');
-  const [commissionPer40kg, setCommissionPer40kg] = useState<number | ''>(1.0);
+  const [commissionPer40kg, setCommissionPer40kg] = useState<number | ''>(1.5);
   const [ratePer40kg, setRatePer40kg] = useState<number | ''>('');
   const [notes, setNotes] = useState<string>('');
+
+  // Expenses
+  const [expenses, setExpenses] = useState<{ expense_type: string; amount: string; is_income: boolean; notes: string }[]>([
+    { expense_type: '', amount: '', is_income: false, notes: '' },
+  ]);
 
   const [availableStockKg, setAvailableStockKg] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,13 +87,23 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
 
   const isStockInsufficient = Number(physicalWeightKg || 0) > availableStockKg && !!cropId;
 
+  // Expense calculations
+  const totalExpensesNet = expenses.reduce((s, e) => {
+    const amt = Number(e.amount) || 0;
+    return s + (e.is_income ? amt : -amt);
+  }, 0);
+  const totalExpensesDisplay = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  const grandTotal = calculations.saleAmountPkr + totalExpensesNet;
+
   const resetForm = () => {
     setCropId('');
     setBuyerId('');
     setPhysicalWeightKg('');
-    setCommissionPer40kg(1.0);
+    setCommissionPer40kg(1.5);
     setRatePer40kg('');
     setNotes('');
+    setExpenses([{ expense_type: '', amount: '', is_income: false, notes: '' }]);
     setErrorMsg('');
   };
 
@@ -105,6 +124,15 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
       return;
     }
 
+    const validExpenses: SaleExpenseInput[] = expenses
+      .filter((e) => Number(e.amount) > 0)
+      .map((e) => ({
+        expense_type: e.expense_type || 'General',
+        amount: Number(e.amount),
+        is_income: e.is_income,
+        notes: e.notes,
+      }));
+
     const res = await saveSaleTransaction({
       crop_id: Number(cropId),
       buyer_id: buyerId ? Number(buyerId) : null,
@@ -112,6 +140,7 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
       commission_per_40kg: Number(commissionPer40kg) || 0,
       rate_per_40kg: Number(ratePer40kg) || 0,
       notes,
+      expenses: validExpenses,
     });
 
     setIsSubmitting(false);
@@ -119,6 +148,8 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
     if (res.success) {
       const crop = crops.find((c) => c.id === Number(cropId));
       const buyer = buyers.find((b) => b.id === Number(buyerId));
+
+      const expNetForReceipt = validExpenses.reduce((s, e) => s + (e.is_income ? e.amount : -e.amount), 0);
 
       setReceipt({
         invoiceNo: res.invoiceNo || `SALE-${Date.now().toString().slice(-6)}`,
@@ -139,6 +170,8 @@ export function SaleEntryForm({ crops, buyers, stockMovements, onSuccess }: Sale
         billableWeightKg: calculations.billableWeightKg,
         ratePer40kg: Number(ratePer40kg) || 0,
         saleAmountPkr: calculations.saleAmountPkr,
+        expenses: validExpenses,
+        totalExpensesNet: expNetForReceipt,
         notes,
       });
 
@@ -182,9 +215,10 @@ Commission : ${receipt.commissionPer40kg} kg per 40 kg
              = ${receipt.commissionWeightKg.toLocaleString()} kg total
 Billable   : ${receipt.billableWeightKg.toLocaleString()} kg
 Rate       : Rs. ${receipt.ratePer40kg.toLocaleString()} per 40 kg
-
+Sale Amt   : Rs. ${receipt.saleAmountPkr.toLocaleString()}
+${receipt.expenses.length > 0 ? `\nEXPENSES\n${receipt.expenses.map(e => `${e.expense_type}: ${e.is_income ? '+' : '-'} Rs. ${e.amount}`).join('\n')}` : ''}
 ============================================================
-TOTAL SALE AMOUNT: Rs. ${receipt.saleAmountPkr.toLocaleString()}
+GRAND TOTAL: Rs. ${(receipt.saleAmountPkr + receipt.totalExpensesNet).toLocaleString()}
 ============================================================
 ${receipt.notes ? `\nNotes: ${receipt.notes}` : ''}
 
@@ -253,7 +287,7 @@ This is a computer-generated receipt.
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Buyer / Customer</p>
                   <p className="font-bold text-sm text-slate-900">{receipt.buyerName}</p>
                   {receipt.buyerPhone && (
-                    <p className="text-xs text-slate-500 mt-0.5">📞 {receipt.buyerPhone}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1"><Phone className="w-3 h-3" />{receipt.buyerPhone}</p>
                   )}
                 </div>
 
@@ -294,11 +328,30 @@ This is a computer-generated receipt.
                   </table>
                 </div>
 
+                {/* Sale Amount */}
+                <div className="flex justify-between text-sm font-semibold border-t border-slate-200 pt-2">
+                  <span>Sale Amount</span>
+                  <span>Rs. {receipt.saleAmountPkr.toLocaleString()}</span>
+                </div>
+
+                {/* Expenses */}
+                {receipt.expenses.length > 0 && (
+                  <div className="space-y-1 text-xs">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Expenses</p>
+                    {receipt.expenses.map((e, i) => (
+                      <div key={i} className={`flex justify-between ${e.is_income ? 'text-emerald-700' : 'text-rose-600'}`}>
+                        <span>{e.expense_type || 'Expense'}{e.notes ? ` (${e.notes})` : ''}</span>
+                        <span>{e.is_income ? '+' : '−'} Rs. {e.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Total Amount */}
                 <div className="bg-emerald-700 text-white rounded-xl px-4 py-3 flex items-center justify-between">
-                  <span className="font-bold text-sm">Total Sale Amount</span>
+                  <span className="font-bold text-sm">Grand Total</span>
                   <span className="text-xl font-extrabold tracking-tight">
-                    Rs. {receipt.saleAmountPkr.toLocaleString()}
+                    Rs. {(receipt.saleAmountPkr + receipt.totalExpensesNet).toLocaleString()}
                   </span>
                 </div>
 
@@ -367,7 +420,6 @@ This is a computer-generated receipt.
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div>
             <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide">New Sale Entry</h2>
-            {/* <p className="text-xs text-slate-500 mt-0.5">Record crop sale, calculate billable weight, and deduct physical stock</p> */}
           </div>
         </div>
 
@@ -430,7 +482,6 @@ This is a computer-generated receipt.
               min="0"
               value={commissionPer40kg}
               onChange={(e) => setCommissionPer40kg(e.target.value === '' ? '' : Number(e.target.value))}
-            // helperText="Default: 1.0 kg per maund"
             />
 
             <TextInputField
@@ -468,6 +519,90 @@ This is a computer-generated receipt.
               </div>
             </div>
           </div>
+
+          {/* ── Expenses Section ── */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-2.5 bg-white border-b border-slate-200 flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Expenses / Income</span>
+              <button
+                type="button"
+                onClick={() => setExpenses((p) => [...p, { expense_type: '', amount: '', is_income: false, notes: '' }])}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> Add Row
+              </button>
+            </div>
+            <div className="px-3 py-2.5 space-y-2">
+              <p className="text-[10px] text-slate-400 mb-1">
+                Click <span className="font-bold text-emerald-600">+</span> to add income (e.g. freight received), or <span className="font-bold text-rose-500">−</span> for expense (deducted from total).
+              </p>
+              {expenses.map((exp, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  {/* Income/Expense Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, is_income: !x.is_income } : x))}
+                    title={exp.is_income ? 'Income (adds to total) — click to switch to expense' : 'Expense (subtracts from total) — click to switch to income'}
+                    className={`shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm font-bold transition ${
+                      exp.is_income
+                        ? 'border-emerald-400 bg-emerald-100 text-emerald-700'
+                        : 'border-rose-300 bg-rose-50 text-rose-600'
+                    }`}
+                  >
+                    {exp.is_income ? '+' : '−'}
+                  </button>
+                  <input
+                    type="text"
+                    placeholder="Type (e.g. Freight, Labour)"
+                    value={exp.expense_type}
+                    onChange={(e) => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, expense_type: e.target.value } : x))}
+                    className="flex-1 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="PKR"
+                    value={exp.amount}
+                    onChange={(e) => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))}
+                    className="w-24 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  {expenses.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setExpenses((p) => p.filter((_, i) => i !== idx))}
+                      className="text-slate-300 hover:text-rose-500"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {totalExpensesDisplay > 0 && (
+                <div className="flex justify-between text-xs font-semibold text-slate-700 pt-1 border-t border-slate-200 mt-1">
+                  <span>Net Adjustment</span>
+                  <span className={totalExpensesNet >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                    {totalExpensesNet >= 0 ? '+' : ''}Rs. {totalExpensesNet.toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Grand Total */}
+          {(Number(physicalWeightKg) > 0 && Number(ratePer40kg) > 0) && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-emerald-700 font-semibold">Grand Total</p>
+                {totalExpensesDisplay > 0 && (
+                  <p className="text-[10px] text-emerald-600">
+                    Sale {totalExpensesNet >= 0 ? '+' : ''} Rs. {totalExpensesNet.toLocaleString()} adjustments
+                  </p>
+                )}
+              </div>
+              <span className="text-xl font-extrabold text-emerald-900">Rs. {grandTotal.toLocaleString()}</span>
+            </div>
+          )}
 
           <TextInputField
             label="Additional Notes / Delivery Instructions"

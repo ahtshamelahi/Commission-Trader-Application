@@ -17,6 +17,9 @@ import {
   BarChart3,
   Store,
   LogOut,
+  BookOpen,
+  Truck,
+  UserCheck,
 } from 'lucide-react';
 
 const navItems = [
@@ -28,6 +31,8 @@ const navItems = [
   { name: 'Parties', href: '/parties', icon: Users },
   { name: 'Expenses', href: '/expenses', icon: Receipt },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Sales Khata', href: '/khata/sales', icon: UserCheck },
+  { name: 'Purch. Khata', href: '/khata/purchases', icon: Truck },
 ];
 
 export function MobileNavigation() {

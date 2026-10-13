@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -14,6 +14,11 @@ import {
   BarChart3,
   Store,
   LogOut,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Truck,
+  UserCheck,
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 
@@ -28,9 +33,15 @@ const navItems = [
   { name: 'Reports', href: '/reports', icon: BarChart3 },
 ];
 
+const khataSubItems = [
+  { name: 'Sales Khata', href: '/khata/sales', icon: UserCheck, desc: 'Buyers' },
+  { name: 'Purchase Khata', href: '/khata/purchases', icon: Truck, desc: 'Suppliers' },
+];
+
 export function SidebarNavigation() {
   const pathname = usePathname();
   const router = useRouter();
+  const [khataOpen, setKhataOpen] = useState(pathname.startsWith('/khata'));
 
   const handleLogout = async () => {
     const supabase = createBrowserClient(
@@ -41,6 +52,8 @@ export function SidebarNavigation() {
     router.push('/login');
     router.refresh();
   };
+
+  const isKhataActive = pathname.startsWith('/khata');
 
   return (
     <aside className="hidden md:flex flex-col w-56 bg-slate-900 text-slate-300 border-r border-slate-800 h-screen sticky top-0 overflow-y-auto">
@@ -76,6 +89,48 @@ export function SidebarNavigation() {
             </Link>
           );
         })}
+
+        {/* Khata Expandable Section */}
+        <div>
+          <button
+            onClick={() => setKhataOpen((o) => !o)}
+            className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              isKhataActive
+                ? 'bg-violet-700 text-white'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <BookOpen className={`w-4 h-4 ${isKhataActive ? 'text-white' : 'text-slate-400'}`} />
+            <span className="flex-1 text-left">Khata</span>
+            {khataOpen
+              ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+          </button>
+
+          {khataOpen && (
+            <div className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-700 pl-3">
+              {khataSubItems.map((sub) => {
+                const Icon = sub.icon;
+                const isActive = pathname === sub.href || pathname.startsWith(sub.href + '/');
+                return (
+                  <Link
+                    key={sub.href}
+                    href={sub.href}
+                    prefetch={true}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'bg-violet-600 text-white'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{sub.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Footer info & Logout */}
@@ -88,7 +143,6 @@ export function SidebarNavigation() {
           <span>Logout</span>
         </button>
         <p>M Shafiq Commission Traders</p>
-        {/* <p className="text-[10px] text-slate-600 mt-0.5">PKR / 40kg Maund Standard</p> */}
       </div>
     </aside>
   );

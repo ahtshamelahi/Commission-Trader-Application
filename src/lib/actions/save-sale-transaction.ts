@@ -6,7 +6,18 @@ import { validateSaleInput } from '@/lib/validations/sale-form-validation';
 import { performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
 import { calculateAvailableStock } from '@/lib/calculations/current-stock-calculation';
 
-export async function saveSaleTransaction(input: NewSaleInput) {
+export interface SaleExpenseInput {
+  expense_type: string;
+  amount: number;
+  is_income: boolean;
+  notes: string;
+}
+
+export interface NewSaleWithExpensesInput extends NewSaleInput {
+  expenses?: SaleExpenseInput[];
+}
+
+export async function saveSaleTransaction(input: NewSaleWithExpensesInput) {
   const supabase = getSupabaseServerClient();
 
   // 1. Fetch current available stock for validation
@@ -32,8 +43,10 @@ export async function saveSaleTransaction(input: NewSaleInput) {
     input.rate_per_40kg
   );
 
+  const validExpenses = (input.expenses || []).filter((e) => Number(e.amount) > 0);
+
   try {
-    // Attempt atomic RPC function
+    // Attempt atomic RPC function with expenses support
     const { data: rpcData, error: rpcError } = await supabase.rpc('fn_record_sale', {
       p_crop_id: input.crop_id,
       p_buyer_id: input.buyer_id || null,
@@ -41,6 +54,7 @@ export async function saveSaleTransaction(input: NewSaleInput) {
       p_commission_per_40kg: input.commission_per_40kg,
       p_rate_per_40kg: input.rate_per_40kg,
       p_notes: input.notes || null,
+      p_expenses: validExpenses.length > 0 ? validExpenses : [],
     });
 
     if (!rpcError && rpcData?.success) {
@@ -89,6 +103,28 @@ export async function saveSaleTransaction(input: NewSaleInput) {
 
     if (stockError) {
       console.error('Stock movement error during sale:', stockError.message);
+    }
+
+    // 3. Insert Sale Expenses
+    if (validExpenses.length > 0) {
+      const saleExpRows = validExpenses.map((e) => ({
+        sale_id: saleId,
+        expense_type: e.expense_type || 'General',
+        amount: Number(e.amount),
+        is_income: e.is_income || false,
+        notes: e.notes || null,
+      }));
+      await supabase.from('sale_expenses').insert(saleExpRows);
+
+      const expRows = validExpenses.map((e) => ({
+        expense_date: new Date().toISOString(),
+        category: e.expense_type || 'General',
+        amount: Number(e.amount),
+        sale_id: saleId,
+        is_income: e.is_income || false,
+        notes: e.notes || null,
+      }));
+      await supabase.from('expenses').insert(expRows);
     }
 
     return {

@@ -41,9 +41,10 @@ interface ReceiptData {
   supplierName: string;
   supplierPhone: string;
   items: ReceiptItem[];
-  expenses: { expense_type: string; amount: number; notes: string }[];
+  expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
   totalCropAmount: number;
-  totalExpenses: number;
+  totalExpensesNet: number;
+  totalExpensesDisplay: number;
 }
 
 const SHOP_NAME = 'M-Shafiq Commission Shop';
@@ -61,15 +62,15 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
   // Item entry
   const [itemBags, setItemBags] = useState('');
   const [itemGrossWeight, setItemGrossWeight] = useState('');
-  const [itemCommission, setItemCommission] = useState('1');
+  const [itemCommission, setItemCommission] = useState('1.5');
   const [itemRate, setItemRate] = useState('');
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
 
   // Expenses (multiple lines)
-  const [expenses, setExpenses] = useState<{ expense_type: string; amount: string; notes: string }[]>([
-    { expense_type: '', amount: '', notes: '' },
+  const [expenses, setExpenses] = useState<{ expense_type: string; amount: string; is_income: boolean; notes: string }[]>([
+    { expense_type: '', amount: '', is_income: false, notes: '' },
   ]);
   const [invoiceNotes, setInvoiceNotes] = useState('');
 
@@ -99,7 +100,12 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
   );
 
   const cartTotal = cart.reduce((s, i) => s + i.cropAmountPkr, 0);
-  const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  // Expenses: income ones ADD to total, regular ones SUBTRACT
+  const totalExpensesNet = expenses.reduce((s, e) => {
+    const amt = Number(e.amount) || 0;
+    return s + (e.is_income ? amt : -amt);
+  }, 0);
+  const totalExpensesDisplay = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
   const isItemReady = !!pickedCropId && Number(itemGrossWeight) > 0 && Number(itemRate) > 0;
 
@@ -138,10 +144,10 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     setPickedVarietyId(null);
     setItemBags('');
     setItemGrossWeight('');
-    setItemCommission('1');
+    setItemCommission('1.5');
     setItemRate('');
     setCart([]);
-    setExpenses([{ expense_type: '', amount: '', notes: '' }]);
+    setExpenses([{ expense_type: '', amount: '', is_income: false, notes: '' }]);
     setInvoiceNotes('');
     setErrorMsg('');
     setMobileTab('items');
@@ -155,7 +161,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
 
     const validExpenses = expenses
       .filter((e) => Number(e.amount) > 0)
-      .map((e) => ({ expense_type: e.expense_type || 'General', amount: Number(e.amount), notes: e.notes }));
+      .map((e) => ({ expense_type: e.expense_type || 'General', amount: Number(e.amount), is_income: e.is_income, notes: e.notes }));
 
     const res = await saveMultiPurchaseTransaction({
       supplier_id: selectedSupplierId,
@@ -188,7 +194,8 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
         })),
         expenses: validExpenses,
         totalCropAmount: cartTotal,
-        totalExpenses,
+        totalExpensesNet,
+        totalExpensesDisplay,
       });
       resetAll();
       if (onSuccess) onSuccess();
@@ -258,15 +265,15 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                   <span>Crop Total</span><span>Rs. {receipt.totalCropAmount.toLocaleString()}</span>
                 </div>
                 {receipt.expenses.map((e, i) => (
-                  <div key={i} className="flex justify-between text-slate-600">
+                  <div key={i} className={`flex justify-between ${e.is_income ? 'text-emerald-700' : 'text-rose-600'}`}>
                     <span>{e.expense_type || 'Expense'}{e.notes ? ` (${e.notes})` : ''}</span>
-                    <span>Rs. {e.amount.toLocaleString()}</span>
+                    <span>{e.is_income ? '+' : '−'} Rs. {e.amount.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
               <div className="bg-blue-700 text-white rounded-xl px-4 py-3 flex items-center justify-between">
                 <span className="font-bold text-sm">Grand Total</span>
-                <span className="text-xl font-extrabold">Rs. {(receipt.totalCropAmount + receipt.totalExpenses).toLocaleString()}</span>
+                <span className="text-xl font-extrabold">Rs. {(receipt.totalCropAmount + receipt.totalExpensesNet).toLocaleString()}</span>
               </div>
               <p className="text-center text-[10px] text-slate-400 border-t border-dashed border-slate-200 pt-2">Computer-generated receipt</p>
             </div>
@@ -436,7 +443,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
             <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Expenses (Transport, Labour etc.)</span>
-              <button type="button" onClick={() => setExpenses((p) => [...p, { expense_type: '', amount: '', notes: '' }])}
+              <button type="button" onClick={() => setExpenses((p) => [...p, { expense_type: '', amount: '', is_income: false, notes: '' }])}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
                 <Plus className="w-3 h-3" /> Add
               </button>
@@ -444,6 +451,19 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
             <div className="px-3 py-2.5 space-y-2">
               {expenses.map((exp, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
+                  {/* Income/Expense Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, is_income: !x.is_income } : x))}
+                    title={exp.is_income ? 'Income (adds to total) — click to switch to expense' : 'Expense (subtracts from total) — click to switch to income'}
+                    className={`shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm font-bold transition ${
+                      exp.is_income
+                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                        : 'border-rose-300 bg-rose-50 text-rose-600'
+                    }`}
+                  >
+                    {exp.is_income ? '+' : '−'}
+                  </button>
                   <input type="text" placeholder="Type (e.g. Truck Rent)" value={exp.expense_type}
                     onChange={(e) => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, expense_type: e.target.value } : x))}
                     className="flex-1 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500" />
@@ -457,9 +477,12 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                   )}
                 </div>
               ))}
-              {totalExpenses > 0 && (
-                <div className="flex justify-between text-xs font-semibold text-slate-700 pt-1">
-                  <span>Total Expenses</span><span>Rs. {totalExpenses.toLocaleString()}</span>
+              {totalExpensesDisplay > 0 && (
+                <div className="flex justify-between text-xs font-semibold text-slate-700 pt-1 border-t border-slate-100 mt-1">
+                  <span>Net Adjustment</span>
+                  <span className={totalExpensesNet >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                    {totalExpensesNet >= 0 ? '+' : ''}Rs. {totalExpensesNet.toLocaleString()}
+                  </span>
                 </div>
               )}
             </div>
@@ -474,9 +497,13 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-blue-700 font-semibold">Grand Total</p>
-                  {totalExpenses > 0 && <p className="text-[10px] text-blue-600">Crops + Rs. {totalExpenses.toLocaleString()} expenses</p>}
+                  {totalExpensesDisplay > 0 && (
+                    <p className="text-[10px] text-blue-600">
+                      Crops {totalExpensesNet >= 0 ? '+' : ''} Rs. {totalExpensesNet.toLocaleString()} expenses
+                    </p>
+                  )}
                 </div>
-                <span className="text-xl font-extrabold text-blue-900">Rs. {(cartTotal + totalExpenses).toLocaleString()}</span>
+                <span className="text-xl font-extrabold text-blue-900">Rs. {(cartTotal + totalExpensesNet).toLocaleString()}</span>
               </div>
             )}
             {errorMsg && (

@@ -19,7 +19,7 @@ export interface MultiPurchaseItem {
 export interface MultiPurchaseInput {
   supplier_id: number | null;
   items: MultiPurchaseItem[];
-  expenses: { expense_type: string; amount: number; notes: string }[];
+  expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
   notes?: string;
 }
 
@@ -87,17 +87,19 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
     if (validExpenses.length > 0) {
       const expRows = validExpenses.map((e) => ({
         expense_date: new Date().toISOString(),
-        category: e.expense_type,
+        category: e.expense_type || 'General',
         amount: Number(e.amount),
         purchase_id: insertedIds[0],
+        is_income: e.is_income || false,
         notes: e.notes || null,
       }));
       await supabase.from('expenses').insert(expRows);
 
       const purExpRows = validExpenses.map((e) => ({
         purchase_id: insertedIds[0],
-        expense_type: e.expense_type,
+        expense_type: e.expense_type || 'General',
         amount: Number(e.amount),
+        is_income: e.is_income || false,
         notes: e.notes || null,
       }));
       await supabase.from('purchase_expenses').insert(purExpRows);
