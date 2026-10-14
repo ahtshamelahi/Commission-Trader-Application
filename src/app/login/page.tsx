@@ -74,15 +74,28 @@ export default function LoginPage() {
         {/* Login area */}
         <main className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 pb-6 pt-4 sm:pb-10">
           <div className="w-full max-w-md -translate-y-6 rounded-3xl bg-white/90 p-6 shadow-2xl shadow-emerald-950/40 ring-1 ring-white/50 backdrop-blur-xl sm:p-8">
-            <div className="text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 shadow-lg shadow-emerald-900/30">
-                <Store className="h-7 w-7 text-white" />
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 shadow-md shadow-emerald-900/30">
+                  <Store className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-left">
+                  <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl leading-tight">
+                    M-Shafiqq
+                  </h1>
+                  <p className="text-xs text-slate-500 font-medium">Commission Shop</p>
+                </div>
               </div>
-              <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
-                M-Shafiq Commission Shop
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">Sign in to your account to continue</p>
+              {/* Company Logo on the right */}
+              <div className="shrink-0">
+                <img
+                  src="/images/shafiq shop logo.jpeg"
+                  alt="M-Shafiq Commission Shop Logo"
+                  className="h-14 w-14 rounded-xl object-contain border border-emerald-100 bg-white p-0.5 shadow-sm"
+                />
+              </div>
             </div>
+            <p className="text-xs text-slate-500 text-left">Sign in to your account to continue</p>
 
             <form onSubmit={handleLogin} className="mt-6 space-y-5">
               {error && (

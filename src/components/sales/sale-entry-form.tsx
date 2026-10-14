@@ -281,12 +281,27 @@ This is a computer-generated receipt.
 
             {/* Receipt Body (printable) */}
             <div ref={receiptRef} className="overflow-y-auto flex-1 print:overflow-visible">
-              <div id="sale-receipt-printable" className="p-6 space-y-4 text-slate-800">
+              <div id="sale-receipt-printable" className="relative p-6 space-y-4 text-slate-800">
+                {/* Background Watermark */}
+                <div
+                  className="pointer-events-none select-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.06] print:opacity-[0.08]"
+                  aria-hidden="true"
+                >
+                  <img
+                    src="/images/shafiq shop logo.jpeg"
+                    alt=""
+                    className="w-56 h-56 object-contain"
+                  />
+                </div>
 
                 {/* Shop Header */}
-                <div className="text-center border-b-2 border-dashed border-slate-300 pb-4">
+                <div className="relative z-10 text-center border-b-2 border-dashed border-slate-300 pb-4">
                   <div className="flex items-center justify-center gap-2 mb-1">
-                    <Store className="w-5 h-5 text-emerald-700" />
+                    <img
+                      src="/images/shafiq shop logo.jpeg"
+                      alt="Logo"
+                      className="w-7 h-7 rounded-md object-contain border border-slate-200"
+                    />
                     <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">{SHOP_NAME}</h1>
                   </div>
                   <p className="text-xs text-slate-500">{SHOP_TAGLINE}</p>

@@ -452,23 +452,39 @@ export function PosSaleForm({
               </button>
             </div>
 
-            <div id="sale-receipt-printable" className="overflow-y-auto flex-1 p-4 space-y-2.5 text-slate-800">
+            <div id="sale-receipt-printable" className="relative overflow-y-auto flex-1 p-4 space-y-2.5 text-slate-800">
+              {/* Background Watermark */}
+              <div
+                className="pointer-events-none select-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.06] print:opacity-[0.08]"
+                aria-hidden="true"
+              >
+                <img
+                  src="/images/shafiq shop logo.jpeg"
+                  alt=""
+                  className="w-56 h-56 object-contain"
+                />
+              </div>
+
               {receiptLoading && (
-                <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+                <div className="relative z-10 flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
                   <Loader2 className="w-4 h-4 animate-spin" /> Loading receipt…
                 </div>
               )}
               {receiptError && (
-                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                <div className="relative z-10 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
                   {receiptError} Your sale is saved under reference <span className="font-mono font-bold">{saved.invoiceNo}</span>.
                 </div>
               )}
               {receipt && (
-                <>
+                <div className="relative z-10 space-y-2.5">
                   <div className="text-center border-b-2 border-dashed border-slate-200 pb-2">
-                    <div className="flex items-center justify-center gap-2 mb-0.5">
-                      <Store className="w-4 h-4 text-emerald-700" />
-                      <span className="font-extrabold text-slate-900">{SHOP_NAME}</span>
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <img
+                        src="/images/shafiq shop logo.jpeg"
+                        alt="Logo"
+                        className="w-7 h-7 rounded-md object-contain border border-slate-200"
+                      />
+                      <span className="font-extrabold text-slate-900 text-base">{SHOP_NAME}</span>
                     </div>
                     <p className="text-[10px] text-slate-400">{SHOP_TAGLINE}</p>
                   </div>
@@ -543,7 +559,7 @@ export function PosSaleForm({
                     <div className="flex justify-between"><span className="text-slate-600">Remaining amount due</span><span className={`font-extrabold ${receipt.remaining > 0 ? 'text-rose-600' : 'text-slate-800'}`}>Rs. {fmt(receipt.remaining)}</span></div>
                   </div>
                   <p className="text-center text-[10px] text-slate-400 border-t border-dashed border-slate-200 pt-2">Computer-generated receipt</p>
-                </>
+                </div>
               )}
             </div>
 

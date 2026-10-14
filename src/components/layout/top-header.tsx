@@ -89,6 +89,16 @@ export function TopHeader({ title = 'Dashboard', subtitle }: TopHeaderProps) {
           <span className="font-semibold">Active</span>
         </div>
 
+        {/* Company Logo on the right side */}
+        <div className="flex items-center">
+          <img
+            src="/images/shafiq shop logo.jpeg"
+            alt="M-Shafiq Logo"
+            className="w-8 h-8 rounded-lg object-contain border border-slate-200 bg-white p-0.5 shadow-2xs hover:scale-105 transition-transform"
+            title="M-Shafiq Commission Shop"
+          />
+        </div>
+
         {/* Logout button — always visible */}
         <button
           onClick={handleLogout}

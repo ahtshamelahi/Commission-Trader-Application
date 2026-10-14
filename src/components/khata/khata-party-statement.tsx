@@ -109,8 +109,20 @@ export function KhataPartyStatement({
   const status = balanceStatus(party.balance);
 
   return (
-    <div className="space-y-3">
-      <div className="print:hidden flex flex-wrap items-start justify-between gap-2">
+    <div className="relative space-y-3">
+      {/* Background Watermark for Print */}
+      <div
+        className="pointer-events-none select-none hidden print:flex fixed inset-0 z-0 items-center justify-center opacity-[0.06]"
+        aria-hidden="true"
+      >
+        <img
+          src="/images/shafiq shop logo.jpeg"
+          alt=""
+          className="w-96 h-96 object-contain"
+        />
+      </div>
+
+      <div className="relative z-10 print:hidden flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">{party.name}</h1>
           <p className="text-xs text-slate-500">
@@ -128,13 +140,25 @@ export function KhataPartyStatement({
         </button>
       </div>
 
-      <div className="hidden print:block mb-3">
-        <p className="text-lg font-extrabold">M-Shafiq Commission Shop</p>
-        <p className="text-sm font-bold">{party.name} — Khata statement</p>
-        <p className="text-xs text-slate-600">
-          {partyTypeLabel(party.party_type)}
-          {party.phone ? ` · ${party.phone}` : ''}
-        </p>
+      <div className="relative z-10 hidden print:block mb-3 border-b pb-3 border-slate-300">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <img
+                src="/images/shafiq shop logo.jpeg"
+                alt="Logo"
+                className="w-8 h-8 rounded-md object-contain border border-slate-300"
+              />
+              <p className="text-lg font-extrabold">M-Shafiq Commission Shop</p>
+            </div>
+            <p className="text-sm font-bold mt-1">{party.name} — Khata statement</p>
+            <p className="text-xs text-slate-600">
+              {partyTypeLabel(party.party_type)}
+              {party.phone ? ` · ${party.phone}` : ''}
+              {party.address ? ` · ${party.address}` : ''}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

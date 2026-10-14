@@ -29,7 +29,22 @@ export const prettyDate = (iso: string) => {
     });
 };
 
-export function buildTradeReportPdf(opts: {
+async function loadBase64Image(url: string): Promise<string | null> {
+    try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        return await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+        });
+    } catch {
+        return null;
+    }
+}
+
+export async function buildTradeReportPdf(opts: {
     kind: TradeKind;
     rows: TradeReportRow[];
     from: string;
@@ -44,7 +59,18 @@ export function buildTradeReportPdf(opts: {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
 
-    // ----- Heading (centered) -----
+    // Load logo
+    const logoData = await loadBase64Image('/images/shafiq shop logo.jpeg');
+
+    // ----- Heading (centered with logo) -----
+    if (logoData) {
+        try {
+            doc.addImage(logoData, 'JPEG', pageW / 2 - 45, 7, 9, 9);
+        } catch {
+            // ignore
+        }
+    }
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(17);
     doc.text(SHOP_NAME, pageW / 2, 13, { align: 'center' });
@@ -120,10 +146,27 @@ export function buildTradeReportPdf(opts: {
         },
     });
 
-    // ----- Footer on every page -----
+    // ----- Watermark & Footer on every page -----
     const pages = doc.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
         doc.setPage(i);
+
+        // Background watermark on each page
+        if (logoData) {
+            try {
+                const gStateClass = (doc as any).GState;
+                if (gStateClass) {
+                    doc.saveGraphicsState();
+                    doc.setGState(new gStateClass({ opacity: 0.08 }));
+                    const wmSize = 90;
+                    doc.addImage(logoData, 'JPEG', (pageW - wmSize) / 2, (pageH - wmSize) / 2, wmSize, wmSize);
+                    doc.restoreGraphicsState();
+                }
+            } catch {
+                // ignore
+            }
+        }
+
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(110);

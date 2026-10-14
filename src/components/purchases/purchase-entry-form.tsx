@@ -253,11 +253,27 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
               <button onClick={() => setReceipt(null)} className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="w-4 h-4" /></button>
             </div>
 
-            <div id="purchase-receipt-printable" className="overflow-y-auto flex-1 p-5 space-y-3 text-slate-800">
-              <div className="text-center border-b-2 border-dashed border-slate-200 pb-3">
-                <div className="flex items-center justify-center gap-2 mb-0.5">
-                  <Store className="w-4 h-4 text-blue-700" />
-                  <span className="font-extrabold text-slate-900">{SHOP_NAME}</span>
+            <div id="purchase-receipt-printable" className="relative overflow-y-auto flex-1 p-5 space-y-3 text-slate-800">
+              {/* Background Watermark */}
+              <div
+                className="pointer-events-none select-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.06] print:opacity-[0.08]"
+                aria-hidden="true"
+              >
+                <img
+                  src="/images/shafiq shop logo.jpeg"
+                  alt=""
+                  className="w-56 h-56 object-contain"
+                />
+              </div>
+
+              <div className="relative z-10 text-center border-b-2 border-dashed border-slate-200 pb-3">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <img
+                    src="/images/shafiq shop logo.jpeg"
+                    alt="Logo"
+                    className="w-7 h-7 rounded-md object-contain border border-slate-200"
+                  />
+                  <span className="font-extrabold text-slate-900 text-base">{SHOP_NAME}</span>
                 </div>
                 <p className="text-[10px] text-slate-400">{SHOP_TAGLINE}</p>
               </div>
