@@ -94,9 +94,8 @@ export function KhataTable({
               key={t.id}
               type="button"
               onClick={() => setFilter(t.id)}
-              className={`px-3 py-1 rounded-md text-xs font-bold transition ${
-                filter === t.id ? 'bg-blue-700 text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition ${filter === t.id ? 'bg-blue-700 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               {t.label} <span className="opacity-70">({t.count})</span>
             </button>
@@ -145,13 +144,12 @@ export function KhataTable({
                   <td className="px-3 py-1.5 text-xs text-slate-600 whitespace-nowrap">{p.phone || '—'}</td>
                   <td className="px-3 py-1.5">
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        p.party_type === 'supplier'
-                          ? 'bg-amber-50 text-amber-700'
-                          : p.party_type === 'both'
-                            ? 'bg-violet-50 text-violet-700'
-                            : 'bg-emerald-50 text-emerald-700'
-                      }`}
+                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${p.party_type === 'supplier'
+                        ? 'bg-amber-50 text-amber-700'
+                        : p.party_type === 'both'
+                          ? 'bg-violet-50 text-violet-700'
+                          : 'bg-emerald-50 text-emerald-700'
+                        }`}
                     >
                       {partyTypeLabel(p.party_type)}
                     </span>
@@ -309,9 +307,8 @@ function PaymentModal({
             <div className="flex items-center justify-between text-xs border-t border-dashed border-slate-200 pt-2">
               <span className="text-slate-500">Balance after</span>
               <span
-                className={`font-bold ${
-                  Math.abs(after) < 0.005 ? 'text-slate-500' : after > 0 ? 'text-emerald-700' : 'text-rose-600'
-                }`}
+                className={`font-bold ${Math.abs(after) < 0.005 ? 'text-slate-500' : after > 0 ? 'text-emerald-700' : 'text-rose-600'
+                  }`}
               >
                 {Math.abs(after) < 0.005
                   ? 'Settled'
@@ -330,9 +327,8 @@ function PaymentModal({
           <button
             type="submit"
             disabled={saving || amt <= 0}
-            className={`w-full flex items-center justify-center gap-2 text-white font-bold text-sm py-2 rounded-lg transition disabled:opacity-40 ${
-              receive ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-700 hover:bg-blue-800'
-            }`}
+            className={`w-full flex items-center justify-center gap-2 text-white font-bold text-sm py-2 rounded-lg transition disabled:opacity-40 ${receive ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-700 hover:bg-blue-800'
+              }`}
           >
             {saving ? (
               <>
@@ -349,4 +345,5 @@ function PaymentModal({
       </form>
     </div>
   );
+
 }
