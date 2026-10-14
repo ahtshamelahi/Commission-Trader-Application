@@ -33,6 +33,7 @@ const navItems = [
   { name: 'Crops', href: '/crops', icon: Sprout },
   { name: 'Expenses', href: '/expenses', icon: Receipt },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Khata', href: '/khata', icon: BookOpen },
   { name: 'Sales Khata', href: '/khata/sales', icon: UserCheck },
   { name: 'Purch. Khata', href: '/khata/purchases', icon: Truck },
 ];

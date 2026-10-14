@@ -37,6 +37,7 @@ const navItems = [
 ];
 
 const khataSubItems = [
+  { name: 'All Parties', href: '/khata', icon: BookOpen, desc: 'Buyers & suppliers' },
   { name: 'Sales Khata', href: '/khata/sales', icon: UserCheck, desc: 'Buyers' },
   { name: 'Purchase Khata', href: '/khata/purchases', icon: Truck, desc: 'Suppliers' },
 ];
@@ -123,7 +124,10 @@ export function SidebarNavigation({ variant = 'default' }: SidebarNavigationProp
             <div className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-700 pl-3">
               {khataSubItems.map((sub) => {
                 const Icon = sub.icon;
-                const isActive = pathname === sub.href || pathname.startsWith(sub.href + '/');
+                const isActive =
+                  sub.href === '/khata'
+                    ? pathname === '/khata'
+                    : pathname === sub.href || pathname.startsWith(sub.href + '/');
                 return (
                   <Link
                     key={sub.href}

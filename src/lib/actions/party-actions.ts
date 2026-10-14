@@ -38,6 +38,7 @@ export async function saveParty(input: {
       revalidatePath('/sales/new');
       revalidatePath('/khata/sales');
       revalidatePath('/khata/purchases');
+      revalidatePath('/khata');
       return { success: true, data };
     } else {
       // Create new
@@ -61,6 +62,7 @@ export async function saveParty(input: {
       revalidatePath('/sales/all');
       revalidatePath('/khata/sales');
       revalidatePath('/khata/purchases');
+      revalidatePath('/khata');
 
       return { success: true, data };
     }

@@ -1,9 +1,12 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import {
   performPurchaseCalculations,
 } from '@/lib/calculations/purchase-amount-calculation';
+
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 export interface MultiPurchaseItem {
   crop_id: number;
@@ -39,6 +42,7 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
 
   try {
     const insertedIds: number[] = [];
+    let itemsTotal = 0;
 
     let itemIndex = 1;
     for (const item of input.items) {
@@ -49,6 +53,7 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
         item.bags || 0,
         item.bardana_per_bag_kg || 0
       );
+      itemsTotal = round2(itemsTotal + calc.cropAmountPkr);
 
       const itemInvoiceNo = input.items.length > 1 ? `${invoiceNo}-${itemIndex}` : invoiceNo;
 
@@ -94,7 +99,7 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
     }
 
     // Shared expenses (linked to first purchase for reference)
-    const validExpenses = input.expenses.filter((e) => Number(e.amount) > 0);
+    const validExpenses = (input.expenses || []).filter((e) => Number(e.amount) > 0);
     if (validExpenses.length > 0) {
       const expRows = validExpenses.map((e) => ({
         expense_date: new Date().toISOString(),
@@ -116,6 +121,20 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
       await supabase.from('purchase_expenses').insert(purExpRows);
     }
 
+    const expNet = validExpenses.reduce(
+      (s, e) => s + (e.is_income ? Number(e.amount) : -Number(e.amount)),
+      0
+    );
+    const documentTotal = round2(itemsTotal + expNet);
+    if (insertedIds[0]) {
+      await supabase
+        .from('purchases')
+        .update({ document_total: documentTotal, amount_paid: 0 })
+        .eq('id', insertedIds[0]);
+    }
+
+    revalidatePath('/khata');
+    revalidatePath('/khata/purchases');
     return { success: true, invoiceNo };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to save purchase.';

@@ -1,8 +1,11 @@
 'use server';
 
 // lib/actions/save-multi-sale-transaction.ts
+import { revalidatePath } from 'next/cache';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
+
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 export interface MultiSaleItem {
   crop_id: number;
@@ -132,6 +135,30 @@ export async function saveMultiSaleTransaction(input: MultiSaleInput): Promise<S
     if (error) return { success: false, message: error.message };
 
     const r = data as { invoice_id: number; invoice_no: string; duplicate?: boolean };
+
+    // Khata snapshot on the first sales row: grand total + amount received.
+    // Ledger reads these columns so invoice payments are not also written to khata_payments.
+    const itemsTotal = items.reduce((s, i) => s + i.sale_amount, 0);
+    const adj = input.expenses.reduce((s, e) => s + (e.is_income ? e.amount : -e.amount), 0);
+    const documentTotal = round2(itemsTotal + adj);
+    if (r.invoice_no && !r.duplicate) {
+      const { data: first } = await supabase
+        .from('sales')
+        .select('id')
+        .eq('invoice_no', r.invoice_no)
+        .order('id', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (first?.id) {
+        await supabase
+          .from('sales')
+          .update({ document_total: documentTotal, amount_received: input.amount_received })
+          .eq('id', first.id);
+      }
+    }
+
+    revalidatePath('/khata');
+    revalidatePath('/khata/sales');
     return {
       success: true,
       invoiceId: r.invoice_id,
