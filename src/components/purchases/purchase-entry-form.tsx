@@ -1,13 +1,14 @@
 'use client';
 
+// components/purchases/purchase-entry-form.tsx
 import React, { useState } from 'react';
 import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 import { performPurchaseCalculations } from '@/lib/calculations/purchase-amount-calculation';
 import { saveMultiPurchaseTransaction, MultiPurchaseItem } from '@/lib/actions/save-multi-purchase-transaction';
 import {
-  CheckCircle2, AlertCircle, Loader2, User, Printer, Download, X,
-  Store, Sprout, Trash2, Plus, Phone, ShoppingCart, Receipt,
+  CheckCircle2, AlertCircle, Loader2, User, Download, X,
+  Store, Sprout, Trash2, Plus, Phone, ShoppingCart,
 } from 'lucide-react';
 
 interface PurchaseEntryFormProps {
@@ -53,6 +54,13 @@ interface ReceiptData {
 
 const SHOP_NAME = 'M-Shafiq Commission Shop';
 const SHOP_TAGLINE = 'Crop Commission Agent — Grain & Commodity Trade';
+
+// shared compact styles (same look as the New Sale page)
+const CARD = 'bg-white border border-slate-200 rounded-lg';
+const CARD_HEAD = 'px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 rounded-t-lg';
+const CARD_TITLE = 'text-[11px] font-bold text-slate-600 uppercase tracking-wide';
+const LABEL = 'text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-0.5';
+const INPUT = 'w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntryFormProps) {
   // Supplier
@@ -170,6 +178,9 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
   };
 
   const handleFinalize = async () => {
+    // Supplier is mandatory — narrow the type from `number | null` to `number`
+    const supplierId = selectedSupplierId;
+    if (supplierId === null) { setErrorMsg('Please select a supplier.'); return; }
     if (!cart.length) { setErrorMsg('Add at least one item.'); return; }
     setIsSubmitting(true);
     setErrorMsg('');
@@ -179,7 +190,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
       .map((e) => ({ expense_type: e.expense_type || 'General', amount: Number(e.amount), is_income: e.is_income, notes: e.notes }));
 
     const res = await saveMultiPurchaseTransaction({
-      supplier_id: selectedSupplierId,
+      supplier_id: supplierId,
       items: cart.map(({ _key, commissionWeightKg, bardanaWeightKg, netWeightKg, cropAmountPkr, ...item }) => item),
       expenses: validExpenses,
       vehicle_number: vehicleNumber || undefined,
@@ -318,30 +329,30 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
       `}</style>
 
       {/* ── Mobile Tab Navigation (Hidden on Desktop) ────── */}
-      <div className="lg:hidden flex border border-slate-200 rounded-lg p-1 bg-slate-100 gap-1 mt-2">
+      <div className="lg:hidden flex border border-slate-200 rounded-lg p-0.5 bg-slate-100 gap-1 mt-2">
         <button
           type="button"
           onClick={() => setMobileTab('items')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition ${mobileTab === 'items'
-            ? 'bg-blue-700 text-white shadow-xs'
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-bold transition ${mobileTab === 'items'
+            ? 'bg-blue-700 text-white'
             : 'text-slate-600 hover:text-slate-900'
             }`}
         >
           <Sprout className="w-3.5 h-3.5" />
-          <span>1. Select Crop & Enter ({crops.length} crops)</span>
+          <span>1. Crop &amp; Items</span>
         </button>
         <button
           type="button"
           onClick={() => setMobileTab('cart')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-bold transition relative ${mobileTab === 'cart'
-            ? 'bg-blue-700 text-white shadow-xs'
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-bold transition ${mobileTab === 'cart'
+            ? 'bg-blue-700 text-white'
             : 'text-slate-600 hover:text-slate-900'
             }`}
         >
           <ShoppingCart className="w-3.5 h-3.5" />
-          <span>2. Cart & Finalize</span>
+          <span>2. Supplier &amp; Save</span>
           {cart.length > 0 && (
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1 ${mobileTab === 'cart' ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
+            <span className={`text-[10px] px-1.5 rounded-full font-bold ${mobileTab === 'cart' ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
               }`}>
               {cart.length}
             </span>
@@ -350,7 +361,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
       </div>
 
       {justAddedMsg && (
-        <div className="lg:hidden flex items-center justify-between p-2.5 mt-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-medium">
+        <div className="lg:hidden flex items-center justify-between p-2 mt-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md text-xs font-medium">
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>Item added! ({cart.length} in cart)</span>
@@ -360,91 +371,90 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
             onClick={() => setMobileTab('cart')}
             className="text-xs font-bold text-blue-700 underline ml-2"
           >
-            Go to Cart & Finalize →
+            Go to Supplier &amp; Save →
           </button>
         </div>
       )}
 
-      {/* ── Purchase Layout ───────────────────────── */}
-      <div className="mt-3 flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-130px)] lg:min-h-[600px]">
+      {/* ── Two equal halves ───────────────────────── */}
+      <div className="mt-2 flex flex-col lg:flex-row gap-3 lg:h-[calc(100vh-120px)] lg:min-h-[560px]">
 
-        {/* LEFT: Supplier + Cart + Expenses + Finalize */}
-        <div className={`${mobileTab === 'cart' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[360px] lg:shrink-0 flex-col gap-2 overflow-y-auto pb-2`}>
+        {/* ═══ LEFT HALF: Supplier + Cart + Expenses + Finalize ═══ */}
+        <div className={`${mobileTab === 'cart' ? 'flex' : 'hidden'} lg:flex lg:flex-1 lg:basis-0 min-w-0 flex-col gap-2 lg:overflow-y-auto`}>
 
           {/* Supplier */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+          <div className={`${CARD} shrink-0`}>
+            <div className={CARD_HEAD}>
               <User className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Supplier / Farmer</span>
+              <span className={CARD_TITLE}>Supplier / Farmer <span className="text-rose-500">*</span></span>
             </div>
             {selectedSupplier ? (
-              <div className="px-4 py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">{selectedSupplier.name.charAt(0)}</div>
-                  <div>
-                    <p className="font-bold text-sm text-slate-900 leading-tight">{selectedSupplier.name}</p>
-                    {selectedSupplier.phone && <p className="text-xs text-slate-500">{selectedSupplier.phone}</p>}
+              <div className="px-3 py-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">{selectedSupplier.name.charAt(0)}</div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-slate-900 leading-tight truncate">{selectedSupplier.name}</p>
+                    {selectedSupplier.phone && <p className="text-[11px] text-slate-500 truncate">{selectedSupplier.phone}</p>}
                   </div>
                 </div>
-                <button onClick={() => { setSelectedSupplierId(null); setSupplierSearch(''); }} className="text-slate-300 hover:text-rose-500 transition"><X className="w-4 h-4" /></button>
+                <button onClick={() => { setSelectedSupplierId(null); setSupplierSearch(''); }} aria-label="Change supplier" className="text-slate-300 hover:text-rose-500 transition shrink-0"><X className="w-4 h-4" /></button>
               </div>
             ) : (
-              <div className="px-3 py-2.5 space-y-2">
+              <div className="p-2 space-y-1.5">
                 <input type="text" placeholder="Search supplier..." value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className={`${INPUT} placeholder-slate-400`} />
                 {supplierSearch && (
-                  <div className="border border-slate-200 rounded-lg overflow-hidden max-h-32 overflow-y-auto">
+                  <div className="border border-slate-200 rounded-md overflow-hidden max-h-32 overflow-y-auto">
                     {filteredSuppliers.length === 0
                       ? <p className="px-3 py-2 text-xs text-slate-400 text-center">No results</p>
                       : filteredSuppliers.map((s) => (
                         <button key={s.id} type="button" onClick={() => { setSelectedSupplierId(s.id); setSupplierSearch(''); }}
-                          className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                          className="w-full text-left px-3 py-1.5 hover:bg-slate-50 border-b border-slate-100 last:border-0">
                           <p className="text-sm font-semibold">{s.name}</p>
-                          {s.phone && <p className="text-xs text-slate-400">{s.phone}</p>}
+                          {s.phone && <p className="text-[11px] text-slate-400">{s.phone}</p>}
                         </button>
                       ))}
                   </div>
                 )}
-                {/* {!supplierSearch && <p className="text-xs text-slate-400 text-center">Optional — select if known</p>} */}
               </div>
             )}
           </div>
 
           {/* Cart */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex-1 flex flex-col min-h-[120px]">
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
+          <div className={`${CARD} overflow-hidden flex flex-col min-h-[88px] lg:flex-1`}>
+            <div className={`${CARD_HEAD} justify-between shrink-0`}>
+              <div className="flex items-center gap-1.5">
                 <ShoppingCart className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Purchase Items</span>
+                <span className={CARD_TITLE}>Purchase Items</span>
               </div>
-              <span className="text-xs font-semibold text-slate-500">{cart.length} item{cart.length !== 1 ? 's' : ''}</span>
+              <span className="text-[11px] font-semibold text-slate-500">{cart.length} item{cart.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
               {cart.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-                  <p className="text-xs text-slate-400 mb-2">No items added yet</p>
+                <div className="flex flex-col items-center justify-center py-5 px-4 text-center">
+                  <p className="text-xs text-slate-400">No items added yet</p>
                   <button
                     type="button"
                     onClick={() => setMobileTab('items')}
-                    className="lg:hidden text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-md border border-blue-200"
+                    className="lg:hidden mt-2 text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-md border border-blue-200"
                   >
                     ← Select Crop to Add
                   </button>
                 </div>
               ) : (
                 cart.map((item) => (
-                  <div key={item._key} className="px-3 py-2.5 flex items-start justify-between gap-2">
+                  <div key={item._key} className="px-3 py-1.5 flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-slate-900 leading-tight truncate">
+                      <p className="font-bold text-[13px] text-slate-900 leading-tight truncate">
                         {item.crop_name}{item.variety_name ? <span className="text-blue-700"> — {item.variety_name}</span> : null}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-0.5">
                         {item.bags > 0 ? `${item.bags} bags · ` : ''}{item.gross_weight_kg.toLocaleString()} kg gross · {item.netWeightKg.toLocaleString()} kg net · Rs. {item.rate_per_40kg.toLocaleString()}/40kg
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-bold text-blue-800 text-sm">Rs. {item.cropAmountPkr.toLocaleString()}</span>
-                      <button onClick={() => setCart((p) => p.filter((i) => i._key !== item._key))} className="text-slate-300 hover:text-rose-500 transition">
+                      <span className="font-bold text-blue-800 text-[13px]">Rs. {item.cropAmountPkr.toLocaleString()}</span>
+                      <button onClick={() => setCart((p) => p.filter((i) => i._key !== item._key))} aria-label="Remove item" className="text-slate-300 hover:text-rose-500 transition">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -453,31 +463,31 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
               )}
             </div>
             {cart.length > 0 && (
-              <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
                 <span className="text-xs font-bold text-slate-700">Crop Total</span>
-                <span className="font-extrabold text-slate-900">Rs. {cartTotal.toLocaleString()}</span>
+                <span className="font-extrabold text-slate-900 text-sm">Rs. {cartTotal.toLocaleString()}</span>
               </div>
             )}
           </div>
 
           {/* Expenses */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Expenses (Transport, Labour etc.)</span>
+          <div className={`${CARD} shrink-0`}>
+            <div className={`${CARD_HEAD} justify-between`}>
+              <span className={CARD_TITLE}>Expenses (Transport, Labour etc.)</span>
               <button type="button" onClick={() => setExpenses((p) => [...p, { expense_type: '', amount: '', is_income: false, notes: '' }])}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
                 <Plus className="w-3 h-3" /> Add
               </button>
             </div>
-            <div className="px-3 py-2.5 space-y-2">
+            <div className="p-2 space-y-1.5">
               {expenses.map((exp, idx) => (
-                <div key={idx} className="flex gap-2 items-center">
+                <div key={idx} className="flex gap-1.5 items-center">
                   {/* Income/Expense Toggle */}
                   <button
                     type="button"
                     onClick={() => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, is_income: !x.is_income } : x))}
                     title={exp.is_income ? 'Income (adds to total) — click to switch to expense' : 'Expense (subtracts from total) — click to switch to income'}
-                    className={`shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm font-bold transition ${
+                    className={`shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center text-sm font-bold transition ${
                       exp.is_income
                         ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
                         : 'border-rose-300 bg-rose-50 text-rose-600'
@@ -487,19 +497,19 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                   </button>
                   <input type="text" placeholder="Type (e.g. Truck Rent)" value={exp.expense_type}
                     onChange={(e) => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, expense_type: e.target.value } : x))}
-                    className="flex-1 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    className="flex-1 min-w-0 px-2 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
                   <input type="number" step="1" min="0" placeholder="PKR" value={exp.amount}
                     onChange={(e) => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))}
-                    className="w-24 px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    className="w-24 px-2 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
                   {expenses.length > 1 && (
-                    <button type="button" onClick={() => setExpenses((p) => p.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-rose-500">
+                    <button type="button" onClick={() => setExpenses((p) => p.filter((_, i) => i !== idx))} aria-label="Remove expense" className="text-slate-300 hover:text-rose-500">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
               ))}
               {totalExpensesDisplay > 0 && (
-                <div className="flex justify-between text-xs font-semibold text-slate-700 pt-1 border-t border-slate-100 mt-1">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 pt-1 border-t border-slate-100">
                   <span>Net Adjustment</span>
                   <span className={totalExpensesNet >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
                     {totalExpensesNet >= 0 ? '+' : ''}Rs. {totalExpensesNet.toLocaleString()}
@@ -510,17 +520,17 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
           </div>
 
           {/* Notes + Finalize */}
-          <div className="shrink-0 space-y-2">
-            <div className="flex gap-2">
+          <div className="shrink-0 space-y-1.5">
+            <div className="grid grid-cols-2 gap-2">
               <input type="text" placeholder="Vehicle number (e.g. LEA-123)" value={vehicleNumber}
                 onChange={(e) => setVehicleNumber(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className={INPUT} />
               <input type="text" placeholder="Invoice notes (optional)" value={invoiceNotes}
                 onChange={(e) => setInvoiceNotes(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className={INPUT} />
             </div>
             {cart.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-blue-700 font-semibold">Grand Total</p>
                   {totalExpensesDisplay > 0 && (
@@ -529,59 +539,59 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                     </p>
                   )}
                 </div>
-                <span className="text-xl font-extrabold text-blue-900">Rs. {(cartTotal + totalExpensesNet).toLocaleString()}</span>
+                <span className="text-lg font-extrabold text-blue-900">Rs. {(cartTotal + totalExpensesNet).toLocaleString()}</span>
               </div>
             )}
             {errorMsg && (
-              <div className="flex items-start gap-2 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
+              <div className="flex items-start gap-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-md font-medium">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{errorMsg}
               </div>
             )}
-            <button onClick={handleFinalize} disabled={!cart.length || isSubmitting}
-              className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-sm py-3 rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
+            <button onClick={handleFinalize} disabled={!cart.length || !selectedSupplierId || isSubmitting}
+              className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-sm py-2.5 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
               {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Saving...</> : `Finalize Purchase (${cart.length} item${cart.length !== 1 ? 's' : ''})`}
             </button>
             <button
               type="button"
               onClick={() => setMobileTab('items')}
-              className="lg:hidden w-full text-center text-xs font-semibold text-slate-600 hover:text-slate-900 py-1"
+              className="lg:hidden w-full text-center text-xs font-semibold text-slate-600 hover:text-slate-900 py-0.5"
             >
               ← Back to Select Crops
             </button>
           </div>
         </div>
 
-        {/* RIGHT: Crop → Variety → Item Entry */}
-        <div className={`${mobileTab === 'items' ? 'flex' : 'hidden'} lg:flex flex-1 flex-col gap-2 overflow-y-auto lg:overflow-hidden pb-2`}>
+        {/* ═══ RIGHT HALF: Crop → Variety → Item entry ═══ */}
+        <div className={`${mobileTab === 'items' ? 'flex' : 'hidden'} lg:flex lg:flex-1 lg:basis-0 min-w-0 flex-col gap-2 lg:overflow-y-auto`}>
 
           {/* Crop selection */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+          <div className={`${CARD} shrink-0`}>
+            <div className={CARD_HEAD}>
               <Sprout className="w-3.5 h-3.5 text-green-600" />
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Step 1 — Select Crop Category</span>
+              <span className={CARD_TITLE}>Step 1 — Crop</span>
             </div>
-            <div className="p-3">
+            <div className="p-2.5">
               {crops.length === 0 ? (
-                <div className="py-6 px-4 text-center">
+                <div className="py-4 text-center">
                   <p className="text-sm font-semibold text-slate-600 mb-1">No crops registered yet</p>
-                  <p className="text-xs text-slate-400 mb-3">Add crop types in Parties & Crop Catalog first.</p>
+                  <p className="text-xs text-slate-400 mb-2">Add crop types in the Crop Catalog first.</p>
                   <a
-                    href="/parties"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-green-700 hover:bg-green-800"
+                    href="/crops"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold text-white bg-green-700 hover:bg-green-800"
                   >
                     Go to Crop Catalog →
                   </a>
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {crops.map((crop) => {
                     const isSelected = pickedCropId === crop.id;
                     return (
                       <button key={crop.id} type="button"
                         onClick={() => { setPickedCropId(crop.id); setPickedVarietyId(null); }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-semibold transition ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white hover:border-blue-300 text-slate-700'
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border-2 text-[13px] font-semibold transition ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white hover:border-blue-300 text-slate-700'
                           }`}>
-                        <Sprout className={`w-4 h-4 ${isSelected ? 'text-blue-600' : 'text-green-600'}`} />
+                        <Sprout className={`w-3.5 h-3.5 ${isSelected ? 'text-blue-600' : 'text-green-600'}`} />
                         {crop.name}
                       </button>
                     );
@@ -593,20 +603,20 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
 
           {/* Variety selection */}
           {pickedCrop && pickedVarieties.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
-              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Step 2 — Variety / Type <span className="text-slate-400 font-normal normal-case">(of {pickedCrop.name})</span>
+            <div className={`${CARD} shrink-0`}>
+              <div className={CARD_HEAD}>
+                <span className={CARD_TITLE}>
+                  Step 2 — Variety <span className="text-slate-400 font-normal normal-case">(of {pickedCrop.name})</span>
                 </span>
               </div>
-              <div className="p-3 flex flex-wrap gap-2">
+              <div className="p-2.5 flex flex-wrap gap-1.5">
                 <button type="button" onClick={() => setPickedVarietyId(null)}
-                  className={`px-3 py-1.5 rounded-lg border-2 text-sm font-semibold transition ${!pickedVarietyId ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                  className={`px-2.5 py-1 rounded-md border-2 text-[13px] font-semibold transition ${!pickedVarietyId ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                   No Variety
                 </button>
                 {pickedVarieties.map((v) => (
                   <button key={v.id} type="button" onClick={() => setPickedVarietyId(v.id)}
-                    className={`px-3 py-1.5 rounded-lg border-2 text-sm font-semibold transition ${pickedVarietyId === v.id ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-700 hover:border-blue-300'}`}>
+                    className={`px-2.5 py-1 rounded-md border-2 text-[13px] font-semibold transition ${pickedVarietyId === v.id ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-700 hover:border-blue-300'}`}>
                     {v.name}
                   </button>
                 ))}
@@ -616,62 +626,55 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
 
           {/* Item entry */}
           {pickedCrop && (
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0">
-              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  {pickedVarieties.length > 0 ? 'Step 3' : 'Step 2'} — Enter Weights & Rate
+            <div className={`${CARD} shrink-0`}>
+              <div className={`${CARD_HEAD} justify-between`}>
+                <span className={CARD_TITLE}>
+                  {pickedVarieties.length > 0 ? 'Step 3' : 'Step 2'} — Weights &amp; Rate
                 </span>
-                <span className="text-xs font-semibold text-blue-700">
-                  {pickedCrop.name}{pickedVarieties.find((v) => v.id === pickedVarietyId)?.name ? ` — ${pickedVarieties.find((v) => v.id === pickedVarietyId)?.name}` : ''}
+                <span className="text-[11px] font-semibold text-blue-700">
+                  {pickedCrop.name}{pickedVariety ? ` — ${pickedVariety.name}` : ''}
                 </span>
               </div>
-              <div className="px-4 py-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
+              <div className="p-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Bags</label>
+                    <label className={LABEL}>Bags</label>
                     <input type="number" step="1" min="0" placeholder="0" value={itemBags}
-                      onChange={(e) => setItemBags(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      onChange={(e) => setItemBags(e.target.value)} className={INPUT} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Gross Weight (kg) <span className="text-rose-500">*</span></label>
+                    <label className={LABEL}>Gross Weight (kg) <span className="text-rose-500">*</span></label>
                     <input type="number" step="1" min="1" placeholder="e.g. 4200" value={itemGrossWeight}
-                      onChange={(e) => setItemGrossWeight(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      onChange={(e) => setItemGrossWeight(e.target.value)} className={INPUT} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Commission / 40 kg (kg)</label>
+                    <label className={LABEL}>Comm. / 40 kg</label>
                     <input type="number" step="0.5" min="0" value={itemCommission}
-                      onChange={(e) => setItemCommission(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      onChange={(e) => setItemCommission(e.target.value)} className={INPUT} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Rate / 40 kg (PKR) <span className="text-rose-500">*</span></label>
+                    <label className={LABEL}>Rate / 40 kg <span className="text-rose-500">*</span></label>
                     <input type="number" step="1" min="1" placeholder="e.g. 3000" value={itemRate}
-                      onChange={(e) => setItemRate(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      onChange={(e) => setItemRate(e.target.value)} className={INPUT} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Bardana / Bag (kg)</label>
+                    <label className={LABEL}>Bardana / bag (kg)</label>
                     <input type="number" step="0.1" min="0" placeholder="e.g. 0.5" value={itemBardana}
-                      onChange={(e) => setItemBardana(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      onChange={(e) => setItemBardana(e.target.value)} className={INPUT} />
                   </div>
                 </div>
 
                 {Number(itemGrossWeight) > 0 && Number(itemRate) > 0 && (
-                  <div className="flex flex-wrap items-center gap-3 text-xs mb-3 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mb-2 bg-slate-50 rounded-md px-2.5 py-1.5 border border-slate-200">
                     <span className="text-slate-500">Comm: <strong className="text-rose-600">−{liveCalc.commissionWeightKg} kg</strong></span>
-                    {liveCalc.bardanaWeightKg > 0 && <><span className="text-slate-300">|</span><span className="text-slate-500">Bardana: <strong className="text-amber-600">−{liveCalc.bardanaWeightKg} kg</strong></span></>}
-                    <span className="text-slate-300">|</span>
+                    {liveCalc.bardanaWeightKg > 0 && <span className="text-slate-500">Bardana: <strong className="text-amber-600">−{liveCalc.bardanaWeightKg} kg</strong></span>}
                     <span className="text-slate-500">Net: <strong className="text-emerald-700">+{liveCalc.netWeightKg} kg</strong></span>
-                    <span className="text-slate-300">|</span>
                     <span className="text-slate-500">Amount: <strong className="text-blue-800">Rs. {liveCalc.cropAmountPkr.toLocaleString()}</strong></span>
                   </div>
                 )}
 
                 <button type="button" onClick={handleAddToCart} disabled={!isItemReady}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm py-2.5 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="w-full flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm py-2 rounded-md transition disabled:opacity-40 disabled:cursor-not-allowed">
                   <Plus className="w-4 h-4" /> Add to Purchase
                 </button>
               </div>
@@ -679,9 +682,9 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
           )}
 
           {!pickedCrop && (
-            <div className="flex-1 flex items-center justify-center bg-white border border-dashed border-slate-300 rounded-xl">
+            <div className="flex-1 flex items-center justify-center bg-white border border-dashed border-slate-300 rounded-lg min-h-[140px]">
               <div className="text-center">
-                <Sprout className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <Sprout className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
                 <p className="text-sm font-semibold text-slate-400">Select a crop above to begin</p>
               </div>
             </div>

@@ -9,6 +9,12 @@ import { MobileNavigation } from '@/components/layout/mobile-navigation';
 /** Pages that open full screen (sidebar hidden). Exact paths only. */
 const FULL_SCREEN_ROUTES = ['/sales/new', '/purchases'];
 
+/** Page background per route, so Purchases looks different from Sales. Others use the default. */
+const ROUTE_BACKGROUNDS: Record<string, string> = {
+  '/purchases': 'bg-amber-50',
+};
+const DEFAULT_BACKGROUND = 'bg-slate-50';
+
 interface DashboardShellContextValue {
   isFullScreen: boolean;
   openMenu: () => void;
@@ -47,7 +53,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <DashboardShellContext.Provider value={value}>
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col md:flex-row">
+      <div
+        className={`min-h-screen ${ROUTE_BACKGROUNDS[pathname] ?? DEFAULT_BACKGROUND} text-slate-900 flex flex-col md:flex-row`}
+      >
         {/* Desktop sidebar: always mounted, only hidden with CSS on full-screen pages */}
         <div className={isFullScreen ? 'hidden' : 'contents'}>
           <SidebarNavigation />

@@ -18,6 +18,12 @@ export interface SaleReceiptItem {
   saleAmountPkr: number;
 }
 
+export interface SaleReceiptExpense {
+  label: string;
+  amount: number;
+  isIncome: boolean; // true = added to the total, false = deducted
+}
+
 export interface SaleReceipt {
   invoiceId: number;
   invoiceNo: string;
@@ -29,6 +35,7 @@ export interface SaleReceipt {
   vehicleNumber: string;
   notes: string;
   items: SaleReceiptItem[];
+  expenses: SaleReceiptExpense[];
   itemsTotal: number;
   adjustmentAmount: number;
   adjustmentIsIncome: boolean; // true = added to total, false = deducted
@@ -81,6 +88,20 @@ export async function getSaleReceipt(
   const amountReceived = round2(initialPayments.reduce((s, p) => s + num(p.amount), 0));
   const grandTotal = num(d.grand_total);
 
+  // expenses saved for this sale (one row per entry)
+  const saleIds: number[] = sales.map((x) => x.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let expenseRows: any[] = [];
+  if (saleIds.length > 0) {
+    const { data: ex } = await supabase
+      .from('expenses')
+      .select('id, category, amount, notes, is_income')
+      .in('sale_id', saleIds)
+      .in('category', ['Sale Expense', 'Sale Adjustment'])
+      .order('id', { ascending: true });
+    expenseRows = ex || [];
+  }
+
   const receipt: SaleReceipt = {
     invoiceId: d.id,
     invoiceNo: d.invoice_no,
@@ -103,6 +124,11 @@ export async function getSaleReceipt(
       billableWeightKg: num(s.billable_weight_kg),
       ratePer40kg: num(s.rate_per_40kg),
       saleAmountPkr: num(s.sale_amount),
+    })),
+    expenses: expenseRows.map((e) => ({
+      label: e.notes || (e.is_income ? 'Added charge' : 'Expense'),
+      amount: num(e.amount),
+      isIncome: !!e.is_income,
     })),
     itemsTotal: num(d.items_total),
     adjustmentAmount: num(d.adjustment_amount),

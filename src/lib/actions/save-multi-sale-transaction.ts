@@ -16,15 +16,20 @@ export interface MultiSaleItem {
   rate_per_40kg: number;
 }
 
+export interface SaleExpenseInput {
+  /** always positive; is_income decides: true = ADDED to the sale total, false = DEDUCTED */
+  amount: number;
+  is_income: boolean;
+  notes?: string;
+}
+
 export interface MultiSaleInput {
   /** unique per save attempt; the database ignores a repeated id (double click / retry) */
   request_id: string;
   buyer_id: number;
   items: MultiSaleItem[];
-  /** always positive; adjustment_is_income decides whether it is added (true) or deducted (false) */
-  adjustment_amount: number;
-  adjustment_is_income: boolean;
-  adjustment_notes?: string;
+  /** zero or more expenses; the sale total = items total + added - deducted */
+  expenses: SaleExpenseInput[];
   vehicle_number?: string;
   notes?: string;
   amount_received: number;
@@ -55,8 +60,13 @@ export async function saveMultiSaleTransaction(input: MultiSaleInput): Promise<S
   if (!isNum(input.amount_received) || input.amount_received < 0) {
     return { success: false, message: 'Amount received cannot be negative.' };
   }
-  if (!isNum(input.adjustment_amount) || input.adjustment_amount < 0) {
-    return { success: false, message: 'Adjustment amount cannot be negative.' };
+  if (!Array.isArray(input.expenses) || input.expenses.length > 50) {
+    return { success: false, message: 'Invalid expenses.' };
+  }
+  for (const e of input.expenses) {
+    if (!isNum(e.amount) || e.amount <= 0 || typeof e.is_income !== 'boolean') {
+      return { success: false, message: 'Each expense must have an amount greater than zero.' };
+    }
   }
 
   for (const item of input.items) {
@@ -108,9 +118,11 @@ export async function saveMultiSaleTransaction(input: MultiSaleInput): Promise<S
         request_id: input.request_id,
         buyer_id: input.buyer_id,
         items,
-        adjustment_amount: input.adjustment_amount,
-        adjustment_is_income: input.adjustment_is_income,
-        adjustment_notes: input.adjustment_notes || '',
+        expenses: input.expenses.map((e) => ({
+          amount: e.amount,
+          is_income: e.is_income,
+          notes: (e.notes || '').trim(),
+        })),
         vehicle_number: input.vehicle_number || '',
         notes: input.notes || '',
         amount_received: input.amount_received,

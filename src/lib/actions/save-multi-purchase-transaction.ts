@@ -23,11 +23,13 @@ export interface MultiPurchaseInput {
   expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
   vehicle_number?: string;
   notes?: string;
-  document_total: number;
-  amount_paid: number;
 }
 
 export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
+  if (!input.supplier_id) {
+    return { success: false, message: 'Supplier is required.' };
+  }
+
   if (!input.items.length) {
     return { success: false, message: 'At least one item is required.' };
   }
@@ -56,7 +58,7 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
           invoice_no: itemInvoiceNo,
           crop_id: item.crop_id,
           variety_id: item.variety_id || null,
-          supplier_id: input.supplier_id || null,
+          supplier_id: input.supplier_id,
           bags: item.bags || 0,
           gross_weight_kg: item.gross_weight_kg,
           commission_per_40kg: item.commission_per_40kg,
@@ -87,7 +89,7 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
         quantity_kg: item.gross_weight_kg,
         notes: `Purchase: ${item.crop_name || ''}${item.variety_name ? ' - ' + item.variety_name : ''}`,
       });
-      
+
       itemIndex++;
     }
 
