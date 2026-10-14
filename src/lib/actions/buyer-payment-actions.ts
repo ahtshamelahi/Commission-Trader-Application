@@ -22,7 +22,7 @@ export async function recordBuyerPayment(input: RecordBuyerPaymentInput) {
     return { success: false, message: 'Invalid request. Please try again.' };
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
 
   try {
     const { data, error } = await supabase.rpc('record_buyer_payment', {

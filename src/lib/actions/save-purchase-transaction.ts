@@ -11,7 +11,7 @@ export async function savePurchaseTransaction(input: NewPurchaseInput) {
     return { success: false, errors: validation.errors };
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
   const calculations = performPurchaseCalculations(
     input.gross_weight_kg,
     input.commission_per_40kg,

@@ -21,7 +21,7 @@ export interface NewSaleWithExpensesInput extends NewSaleInput {
 }
 
 export async function saveSaleTransaction(input: NewSaleWithExpensesInput) {
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
 
   // 1. Fetch current available stock for validation
   const { data: movements, error: moveError } = await supabase

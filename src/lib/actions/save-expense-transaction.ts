@@ -12,7 +12,7 @@ export async function saveExpenseTransaction(input: NewExpenseInput) {
     return { success: false, message: 'Expense amount must be greater than 0.' };
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase =await getSupabaseServerClient();
 
   try {
     const { data, error } = await supabase

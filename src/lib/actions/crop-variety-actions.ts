@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 
 export async function saveCropVariety(cropId: number, name: string) {
   if (!name.trim()) return { success: false, message: 'Variety name is required.' };
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from('crop_varieties')
     .insert({ crop_id: cropId, name: name.trim() })
@@ -23,7 +23,7 @@ export async function saveCropVariety(cropId: number, name: string) {
 }
 
 export async function deleteCropVariety(varietyId: number) {
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
   const { error } = await supabase.from('crop_varieties').delete().eq('id', varietyId);
   if (error) return { success: false, message: error.message };
 

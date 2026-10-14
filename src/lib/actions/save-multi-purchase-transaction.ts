@@ -37,7 +37,7 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
     return { success: false, message: 'At least one item is required.' };
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
   const invoiceNo = `PUR-${Date.now().toString().slice(-8)}`;
 
   try {

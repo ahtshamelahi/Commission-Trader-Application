@@ -15,7 +15,7 @@ export async function saveParty(input: {
     return { success: false, message: 'Party name is required.' };
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
 
   try {
     if (input.id) {

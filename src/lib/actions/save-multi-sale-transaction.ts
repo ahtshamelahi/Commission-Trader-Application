@@ -112,7 +112,7 @@ export async function saveMultiSaleTransaction(input: MultiSaleInput): Promise<S
     };
   });
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
 
   try {
     // one database transaction: invoice + items + stock + adjustment + initial payment

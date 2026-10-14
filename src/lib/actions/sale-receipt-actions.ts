@@ -54,7 +54,7 @@ export async function getSaleReceipt(
     return { success: false, message: 'Invalid sale.' };
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('sale_invoices')

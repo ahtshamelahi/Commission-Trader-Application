@@ -9,7 +9,7 @@ export async function saveCrop(name: string) {
     return { success: false, message: 'Crop name is required.' };
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient();
 
   try {
     const { data, error } = await supabase
