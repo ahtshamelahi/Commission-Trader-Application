@@ -33,6 +33,11 @@ export async function saveParty(input: {
         .single();
 
       if (error) return { success: false, message: error.message };
+      revalidatePath('/parties');
+      revalidatePath('/purchases');
+      revalidatePath('/sales/new');
+      revalidatePath('/khata/sales');
+      revalidatePath('/khata/purchases');
       return { success: true, data };
     } else {
       // Create new
@@ -51,8 +56,11 @@ export async function saveParty(input: {
 
       revalidatePath('/purchases');
       revalidatePath('/parties');
+      revalidatePath('/crops');
       revalidatePath('/sales/new');
       revalidatePath('/sales/all');
+      revalidatePath('/khata/sales');
+      revalidatePath('/khata/purchases');
 
       return { success: true, data };
     }

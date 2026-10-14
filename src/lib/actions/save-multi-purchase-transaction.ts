@@ -18,11 +18,13 @@ export interface MultiPurchaseItem {
 }
 
 export interface MultiPurchaseInput {
-  supplier_id: number | null;
+  supplier_id: number;
   items: MultiPurchaseItem[];
   expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
   vehicle_number?: string;
   notes?: string;
+  document_total: number;
+  amount_paid: number;
 }
 
 export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {

@@ -1,9 +1,11 @@
 'use client';
 
+// components/layout/top-header.tsx
 import React from 'react';
-import { Calendar, Building2, LogOut } from 'lucide-react';
+import { Calendar, Building2, LogOut, Menu, ArrowLeft } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
+import { useDashboardShell } from '@/components/layout/dashboard-shell';
 
 interface TopHeaderProps {
   title?: string;
@@ -12,6 +14,8 @@ interface TopHeaderProps {
 
 export function TopHeader({ title = 'Dashboard', subtitle }: TopHeaderProps) {
   const router = useRouter();
+  // isFullScreen is true only on pages where the sidebar is hidden (New Sale, Purchases)
+  const { isFullScreen, openMenu } = useDashboardShell();
 
   const currentDate = new Date().toLocaleDateString('en-PK', {
     weekday: 'short',
@@ -31,12 +35,43 @@ export function TopHeader({ title = 'Dashboard', subtitle }: TopHeaderProps) {
     router.refresh();
   };
 
+  // go to the previous page; if there is none (page opened directly), go to the dashboard
+  const handleBack = () => {
+    if (window.history.length > 1) router.back();
+    else router.push('/dashboard');
+  };
+
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between bg-white border-b border-slate-200 px-3 py-2 shadow-2xs gap-2">
-      {/* Page title */}
-      <div className="min-w-0">
-        <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">{title}</h1>
-        {subtitle && <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 truncate hidden sm:block">{subtitle}</p>}
+      {/* Left: Menu + Back (full-screen pages only) and page title */}
+      <div className="flex items-center gap-2 min-w-0">
+        {isFullScreen && (
+          <>
+            <button
+              type="button"
+              onClick={openMenu}
+              aria-label="Open menu"
+              title="Menu"
+              className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors shrink-0"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label="Back"
+              title="Back"
+              className="flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 px-2 py-1.5 rounded-md border border-slate-200 hover:bg-slate-100 transition-colors shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          </>
+        )}
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">{title}</h1>
+          {subtitle && <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 truncate hidden sm:block">{subtitle}</p>}
+        </div>
       </div>
 
       {/* Right side */}

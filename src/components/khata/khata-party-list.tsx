@@ -43,11 +43,15 @@ interface KhataPartyListProps {
   type: 'sales' | 'purchases';
   title: string;
   colorScheme?: 'emerald' | 'blue';
+  initialPartyId?: number | null;
 }
 
-export function KhataPartyList({ parties, type, title, colorScheme = 'emerald' }: KhataPartyListProps) {
+export function KhataPartyList({ parties, type, title, colorScheme = 'emerald', initialPartyId }: KhataPartyListProps) {
   const [search, setSearch] = useState('');
-  const [selectedParty, setSelectedParty] = useState<KhataParty | null>(null);
+  const [selectedParty, setSelectedParty] = useState<KhataParty | null>(() => {
+    if (initialPartyId == null) return null;
+    return parties.find((p) => p.id === initialPartyId) || null;
+  });
   const [receiptTx, setReceiptTx] = useState<KhataTransaction | null>(null);
 
   const filtered = parties.filter(

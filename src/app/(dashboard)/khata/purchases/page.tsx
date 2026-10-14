@@ -8,7 +8,13 @@ export const metadata = {
   description: 'View all supplier accounts, transaction history and receipts.',
 };
 
-export default async function PurchaseKhataPage() {
+export default async function PurchaseKhataPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ partyId?: string }>;
+}) {
+  const { partyId: partyIdParam } = await searchParams;
+  const initialPartyId = partyIdParam ? Number(partyIdParam) : null;
   const supabase = getSupabaseServerClient();
 
   // Fetch all purchases with supplier and crop info
@@ -93,6 +99,7 @@ export default async function PurchaseKhataPage() {
           type="purchases"
           title="All Suppliers"
           colorScheme="blue"
+          initialPartyId={initialPartyId && !Number.isNaN(initialPartyId) ? initialPartyId : null}
         />
       </div>
     </>

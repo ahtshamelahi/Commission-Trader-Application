@@ -1,5 +1,6 @@
 'use client';
 
+// components/layout/sidebar-navigation.tsx
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -11,6 +12,7 @@ import {
   ClipboardList,
   Receipt,
   Users,
+  Sprout,
   BarChart3,
   Store,
   LogOut,
@@ -29,6 +31,7 @@ const navItems = [
   { name: 'Purchases', href: '/purchases', icon: ShoppingCart },
   { name: 'Current Stock', href: '/stock', icon: Boxes },
   { name: 'Parties', href: '/parties', icon: Users },
+  { name: 'Crops', href: '/crops', icon: Sprout },
   { name: 'Expenses', href: '/expenses', icon: Receipt },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
 ];
@@ -38,7 +41,12 @@ const khataSubItems = [
   { name: 'Purchase Khata', href: '/khata/purchases', icon: Truck, desc: 'Suppliers' },
 ];
 
-export function SidebarNavigation() {
+interface SidebarNavigationProps {
+  /** 'default' = normal desktop sidebar; 'drawer' = shown over a full-screen page (all screen sizes) */
+  variant?: 'default' | 'drawer';
+}
+
+export function SidebarNavigation({ variant = 'default' }: SidebarNavigationProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [khataOpen, setKhataOpen] = useState(pathname.startsWith('/khata'));
@@ -55,8 +63,13 @@ export function SidebarNavigation() {
 
   const isKhataActive = pathname.startsWith('/khata');
 
+  const asideClass =
+    variant === 'drawer'
+      ? 'flex flex-col w-64 max-w-[85vw] bg-slate-900 text-slate-300 border-r border-slate-800 h-full overflow-y-auto shadow-2xl'
+      : 'hidden md:flex flex-col w-56 bg-slate-900 text-slate-300 border-r border-slate-800 h-screen sticky top-0 overflow-y-auto';
+
   return (
-    <aside className="hidden md:flex flex-col w-56 bg-slate-900 text-slate-300 border-r border-slate-800 h-screen sticky top-0 overflow-y-auto">
+    <aside className={asideClass}>
       {/* Brand Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800 bg-slate-950">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-600 text-white font-bold">
@@ -145,5 +158,3 @@ export function SidebarNavigation() {
     </aside>
   );
 }
-
-

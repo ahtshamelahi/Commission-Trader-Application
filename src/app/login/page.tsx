@@ -54,7 +54,7 @@ export default function LoginPage() {
           to { transform: rotate(360deg); }
         }
         .truck-drive  { animation: truck-drive 30s linear infinite; }
-        .truck-bounce { animation: truck-bounce 0.65s ease-in-out infinite; }
+        .truck-bounce { animation: truck-bounce 2s ease-in-out infinite; }
         .road-lines   { animation: road-move 1900s linear infinite; }
         .wheel        { transform-box: fill-box; transform-origin: center; animation: wheel-spin 1.5s linear infinite; }
         @media (prefers-reduced-motion: reduce) {

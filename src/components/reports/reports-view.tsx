@@ -13,7 +13,7 @@ import { Expense } from '@/types/expense-data-types';
 import { StockMovement } from '@/types/stock-data-types';
 
 /* ----------------------------- PDF generator ----------------------------- */
-const SHOP_NAME = 'M Shafiq Commission Shop';
+const SHOP_NAME = 'M Shafiq Commission Shoppp';
 
 type TradeKind = 'sales' | 'purchases';
 
@@ -22,12 +22,18 @@ interface TradeReportRow {
   party: string;
   ref: string;
   vehicleNumber: string;
+  crop: string;
   totalWeight: number;
   commissionWeight: number;
+  bardana: number;
+  finalWeight: number; // total - commission - bardana
   pricePerMaund: number;
-  totalPrice: number;
-  expenses: number;
+  itemAmount: number;
+  expenses: number; // net: expenses added, income subtracted
+  grandTotal: number;
 }
+
+type ExpenseRow = { amount?: number | string | null; is_income?: boolean | null };
 
 const nf = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
 
@@ -58,11 +64,11 @@ function buildTradeReportPdf(opts: {
 
   // ----- Heading (centered) -----
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(17);
+  doc.setFontSize(16);
   doc.text(SHOP_NAME, pageW / 2, 13, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   const rangeText =
     from || to
       ? `${from ? prettyDate(from) : 'Beginning'}  to  ${to ? prettyDate(to) : 'Present'}`
@@ -72,45 +78,57 @@ function buildTradeReportPdf(opts: {
   doc.setDrawColor(200, 210, 215);
   doc.line(10, 22, pageW - 10, 22);
 
-  // ----- Totals -----
+  // ----- Table data -----
   const sum = (k: keyof TradeReportRow) => rows.reduce((t, r) => t + (r[k] as number), 0);
-  const showExpenses = !isSales; // sales have no expenses
 
   const head = [
     'Date',
+    'Transaction No',
     `${partyLabel} Name`,
-    'ID',
     'Vehicle No.',
+    'Crop',
     'Total Weight (kg)',
-    'Commission (kg)',
-    'Price / Maund',
-    'Total Price',
-    ...(showExpenses ? ['Expenses'] : []),
+    'Commission Wt (kg)',
+    'Bardana (kg)',
+    'Final Weight (kg)',
+    'Rate / 40 kg',
+    'Item Amount',
+    'Expenses',
+    'Grand Total',
   ];
 
   const body = rows.map((r) => [
     prettyDate(r.date),
-    r.party,
     r.ref,
+    r.party,
     r.vehicleNumber || '—',
+    r.crop,
     nf(r.totalWeight),
     nf(r.commissionWeight),
+    nf(r.bardana),
+    nf(r.finalWeight),
     nf(r.pricePerMaund),
-    nf(r.totalPrice),
-    ...(showExpenses ? [nf(r.expenses)] : []),
+    nf(r.itemAmount),
+    nf(r.expenses),
+    nf(r.grandTotal),
   ]);
 
   const foot = [
-    { content: `Total (${rows.length} records)`, colSpan: 3, styles: { halign: 'right' as const } },
+    { content: `Total (${rows.length} records)`, colSpan: 5, styles: { halign: 'right' as const } },
     nf(sum('totalWeight')),
     nf(sum('commissionWeight')),
+    nf(sum('bardana')),
+    nf(sum('finalWeight')),
     '',
-    nf(sum('totalPrice')),
-    ...(showExpenses ? [nf(sum('expenses'))] : []),
+    nf(sum('itemAmount')),
+    nf(sum('expenses')),
+    nf(sum('grandTotal')),
   ];
 
-  const columnStyles: Record<number, { halign: 'right' }> = {};
-  for (let i = 3; i < head.length; i++) columnStyles[i] = { halign: 'right' };
+  // numeric columns (index 5 onwards) are right-aligned
+  const columnStyles: Record<number, { halign: 'right'; fontStyle?: 'bold' }> = {};
+  for (let i = 5; i < head.length; i++) columnStyles[i] = { halign: 'right' };
+  columnStyles[12] = { halign: 'right', fontStyle: 'bold' }; // Grand Total bold
 
   // ----- Table (small font so many rows fit on one page) -----
   autoTable(doc, {
@@ -122,13 +140,14 @@ function buildTradeReportPdf(opts: {
     margin: { top: 12, left: 10, right: 10, bottom: 12 },
     theme: 'grid',
     styles: {
-      fontSize: 7,
-      cellPadding: { top: 1, bottom: 1, left: 1.5, right: 1.5 },
+      fontSize: 6.5,
+      cellPadding: { top: 0.9, bottom: 0.9, left: 1.2, right: 1.2 },
       lineColor: [210, 218, 224],
       lineWidth: 0.1,
       textColor: [15, 23, 42],
+      overflow: 'linebreak',
     },
-    headStyles: { fillColor: [4, 120, 87], textColor: 255, fontSize: 7.5, fontStyle: 'bold' },
+    headStyles: { fillColor: [4, 120, 87], textColor: 255, fontSize: 7, fontStyle: 'bold' },
     footStyles: { fillColor: [226, 240, 233], textColor: [15, 23, 42], fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [246, 249, 248] },
     columnStyles,
@@ -167,37 +186,71 @@ const toISODate = (v: unknown) => {
 };
 
 const partyName = (p: unknown) => (p as { name?: string } | undefined)?.name ?? '-';
+const cropName = (c: unknown) => (c as { name?: string } | undefined)?.name ?? '-';
 const byDate = (a: TradeReportRow, b: TradeReportRow) => a.date.localeCompare(b.date);
+
+// expense (is_income = false) is ADDED, income (is_income = true) is SUBTRACTED
+// If your app works the other way round, flip the sign here.
+const netExpenses = (list?: ExpenseRow[] | null) =>
+  (list ?? []).reduce((s, e) => s + (e.is_income ? -1 : 1) * toNum(e.amount), 0);
 
 function normalizeSales(rows: Sale[]): TradeReportRow[] {
   return rows
-    .map((r) => ({
-      date: toISODate(r.created_at),
-      party: partyName(r.parties),
-      ref: r.invoice_no ?? String(r.id),
-      vehicleNumber: r.vehicle_number || '',
-      totalWeight: toNum(r.physical_weight_kg),
-      commissionWeight: toNum(r.commission_weight_kg),
-      pricePerMaund: toNum(r.rate_per_40kg),
-      totalPrice: toNum(r.sale_amount),
-      expenses: 0,
-    }))
+    .map((r) => {
+      const x = r as unknown as {
+        crops?: unknown;
+        bardana_total_kg?: unknown;
+        sale_expenses?: ExpenseRow[];
+      };
+      const itemAmount = toNum(r.sale_amount);
+      const expenses = netExpenses(x.sale_expenses);
+      return {
+        date: toISODate(r.created_at),
+        party: partyName(r.parties),
+        ref: r.invoice_no ?? String(r.id),
+        vehicleNumber: r.vehicle_number || '',
+        crop: cropName(x.crops),
+        totalWeight: toNum(r.physical_weight_kg),
+        commissionWeight: toNum(r.commission_weight_kg),
+        bardana: toNum(x.bardana_total_kg),
+        finalWeight: 0, // set below
+        pricePerMaund: toNum(r.rate_per_40kg),
+        itemAmount,
+        expenses,
+        grandTotal: itemAmount + expenses,
+      };
+    })
+    .map((r) => ({ ...r, finalWeight: r.totalWeight - r.commissionWeight - r.bardana }))
     .sort(byDate);
 }
 
 function normalizePurchases(rows: Purchase[]): TradeReportRow[] {
   return rows
-    .map((r) => ({
-      date: toISODate(r.created_at),
-      party: partyName(r.parties),
-      ref: r.invoice_no ?? String(r.id),
-      vehicleNumber: r.vehicle_number || '',
-      totalWeight: toNum(r.gross_weight_kg),
-      commissionWeight: toNum(r.commission_weight_kg),
-      pricePerMaund: toNum(r.rate_per_40kg),
-      totalPrice: toNum(r.crop_amount),
-      expenses: (r.purchase_expenses ?? []).reduce((sum, e) => sum + toNum(e.amount), 0),
-    }))
+    .map((r) => {
+      const x = r as unknown as {
+        crops?: unknown;
+        bardana_total_kg?: unknown;
+        purchase_expenses?: ExpenseRow[];
+      };
+      const itemAmount = toNum(r.crop_amount);
+      const expenses = netExpenses(x.purchase_expenses);
+      return {
+        date: toISODate(r.created_at),
+        party: partyName(r.parties),
+        ref: r.invoice_no ?? String(r.id),
+        vehicleNumber: r.vehicle_number || '',
+        crop: cropName(x.crops),
+        totalWeight: toNum(r.gross_weight_kg),
+        commissionWeight: toNum(r.commission_weight_kg),
+        bardana: toNum(x.bardana_total_kg),
+        finalWeight: 0, // set below
+        pricePerMaund: toNum(r.rate_per_40kg),
+        itemAmount,
+        expenses,
+        grandTotal: itemAmount + expenses,
+      };
+    })
+    .map((r) => ({ ...r, finalWeight: r.totalWeight - r.commissionWeight - r.bardana }))
     .sort(byDate);
 }
 
@@ -270,8 +323,9 @@ export function ReportsView({ purchases, sales, isLoading }: ReportsViewProps) {
     return allRows[kind].filter((r) => (!from || r.date >= from) && (!to || r.date <= to));
   }, [allRows, kind, from, to]);
 
-  const totalPrice = rows.reduce((s, r) => s + r.totalPrice, 0);
+  const totalPrice = rows.reduce((s, r) => s + r.itemAmount, 0);
   const totalExpenses = rows.reduce((s, r) => s + r.expenses, 0);
+  const totalGrand = rows.reduce((s, r) => s + r.grandTotal, 0);
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
 
   const choosePreset = (p: Preset) => {
@@ -412,13 +466,10 @@ export function ReportsView({ purchases, sales, isLoading }: ReportsViewProps) {
               </span>
             ) : (
               <span>
-                <span className="font-bold">{rows.length}</span> {kind === 'sales' ? 'sales' : 'purchases'} · Total price{' '}
-                <span className="font-bold">{fmt(totalPrice)}</span>
-                {kind === 'purchases' && (
-                  <>
-                    {' '}· Expenses <span className="font-bold">{fmt(totalExpenses)}</span>
-                  </>
-                )}
+                <span className="font-bold">{rows.length}</span> {kind === 'sales' ? 'sales' : 'purchases'} · Item amount{' '}
+                <span className="font-bold">{fmt(totalPrice)}</span> · Expenses{' '}
+                <span className="font-bold">{fmt(totalExpenses)}</span> · Grand total{' '}
+                <span className="font-bold">{fmt(totalGrand)}</span>
               </span>
             )}
           </div>
