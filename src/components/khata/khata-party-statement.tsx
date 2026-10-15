@@ -173,73 +173,13 @@ export function KhataPartyStatement({
         <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 col-span-2 sm:col-span-1">
           <p className="text-[10px] font-bold text-slate-500 uppercase">Current outstanding</p>
           <p
-            className={`text-sm font-extrabold ${
-              status === 'settled' ? 'text-slate-500' : status === 'receivable' ? 'text-emerald-700' : 'text-rose-600'
-            }`}
+            className={`text-sm font-extrabold ${status === 'settled' ? 'text-slate-500' : status === 'receivable' ? 'text-emerald-700' : 'text-rose-600'
+              }`}
           >
             {status === 'settled' ? 'Settled' : `${money(party.balance)} · ${status}`}
           </p>
         </div>
       </div>
-
-      <div className="print:hidden bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-        <p className="text-[10px] font-bold text-slate-500 uppercase">Manual entry</p>
-        <form onSubmit={submitManual} className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
-          <div>
-            <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Type</label>
-            <select
-              value={direction}
-              onChange={(e) => setDirection(e.target.value as 'received' | 'paid')}
-              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md"
-            >
-              <option value="received">Money received</option>
-              <option value="paid">Money paid</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Date</label>
-            <input
-              type="datetime-local"
-              value={paidAt}
-              onChange={(e) => setPaidAt(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Note</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Short note"
-              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className={`inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold text-white disabled:opacity-50 ${
-              direction === 'received' ? 'bg-emerald-600' : 'bg-blue-700'
-            }`}
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : direction === 'received' ? <HandCoins className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}
-            Save
-          </button>
-        </form>
-        {error && <p className="text-xs text-rose-600">{error}</p>}
-      </div>
-
       <div className="print:hidden flex flex-col sm:flex-row gap-2 sm:items-end">
         <div>
           <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">From</label>

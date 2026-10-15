@@ -62,6 +62,18 @@ export function PurchaseDetailsTable({ purchases, isLoading }: PurchaseDetailsTa
       ),
     },
     {
+      header: 'Paid',
+      align: 'right',
+      cell: (row) => {
+        const paid = Number(row.amount_paid) || 0;
+        return (
+          <span className={`text-xs font-semibold ${paid > 0 ? 'text-blue-700' : 'text-slate-400'}`}>
+            {paid > 0 ? `Rs. ${paid.toLocaleString()}` : 'Credit'}
+          </span>
+        );
+      },
+    },
+    {
       header: 'Date',
       align: 'right',
       cell: (row) => new Date(row.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }),

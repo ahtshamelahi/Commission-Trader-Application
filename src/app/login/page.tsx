@@ -73,7 +73,14 @@ export default function LoginPage() {
       <div className="relative z-10 flex h-full flex-col">
         {/* Login area */}
         <main className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 pb-6 pt-4 sm:pb-10">
-          <div className="w-full max-w-md -translate-y-6 rounded-3xl bg-white/90 p-6 shadow-2xl shadow-emerald-950/40 ring-1 ring-white/50 backdrop-blur-xl sm:p-8">
+          <div className="relative w-full max-w-md -translate-y-6 overflow-hidden rounded-3xl bg-white/90 p-6 shadow-2xl shadow-emerald-950/40 ring-1 ring-white/50 backdrop-blur-xl sm:p-8">
+            {/* Logo watermark — one logo behind the login form */}
+            <img
+              src="/images/shafiq shop logo.jpeg"
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 -z-10 m-auto h-[85%] w-auto max-w-[85%] object-contain opacity-[0.10] mix-blend-multiply"
+            />
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 shadow-md shadow-emerald-900/30">
@@ -81,7 +88,7 @@ export default function LoginPage() {
                 </div>
                 <div className="text-left">
                   <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl leading-tight">
-                    M-Shafiqq
+                    M-Shafiq
                   </h1>
                   <p className="text-xs text-slate-500 font-medium">Commission Shop</p>
                 </div>

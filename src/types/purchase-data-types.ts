@@ -25,6 +25,8 @@ export interface Purchase {
   crop_amount: number;
   vehicle_number: string | null;
   notes: string | null;
+  document_total?: number | null;
+  amount_paid?: number | null;
   created_at: string;
   crops?: Crop;
   parties?: Party;

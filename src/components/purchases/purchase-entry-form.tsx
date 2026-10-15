@@ -8,12 +8,17 @@ import { performPurchaseCalculations } from '@/lib/calculations/purchase-amount-
 import { saveMultiPurchaseTransaction, MultiPurchaseItem } from '@/lib/actions/save-multi-purchase-transaction';
 import {
   CheckCircle2, AlertCircle, Loader2, User, Download, X,
-  Store, Sprout, Trash2, Plus, Phone, ShoppingCart,
+  Store, Sprout, Trash2, Plus, Phone, ShoppingCart, Wallet,
 } from 'lucide-react';
+
+export interface SupplierOption extends Party {
+  /** outstanding Khata balance; null when it could not be loaded */
+  outstanding?: number | null;
+}
 
 interface PurchaseEntryFormProps {
   crops: Crop[];
-  suppliers: Party[];
+  suppliers: SupplierOption[];
   onSuccess?: () => void;
 }
 
@@ -50,10 +55,17 @@ interface ReceiptData {
   totalCropAmount: number;
   totalExpensesNet: number;
   totalExpensesDisplay: number;
+  amountPaid: number;
+  remainingDue: number;
 }
+
+type PaymentMode = 'full' | 'partial' | 'none';
 
 const SHOP_NAME = 'M-Shafiq Commission Shop';
 const SHOP_TAGLINE = 'Crop Commission Agent — Grain & Commodity Trade';
+
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
 
 // shared compact styles (same look as the New Sale page)
 const CARD = 'bg-white border border-slate-200 rounded-lg';
@@ -87,6 +99,10 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
   ]);
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
+
+  // Payment method (like in New Sale: full, partial, none)
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
+  const [partialAmount, setPartialAmount] = useState('');
 
   // UI
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,6 +138,17 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     return s + (e.is_income ? amt : -amt);
   }, 0);
   const totalExpensesDisplay = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  const grandTotal = round2(cartTotal + totalExpensesNet);
+
+  // Payment amounts (update instantly with option / amount changes)
+  const amountPaid =
+    paymentMode === 'full' ? grandTotal
+    : paymentMode === 'partial' ? round2(Number(partialAmount) || 0)
+    : 0;
+  const remainingDue = round2(grandTotal - amountPaid);
+  const partialInvalid =
+    paymentMode === 'partial' && (amountPaid < 0 || amountPaid > grandTotal);
 
   const isItemReady = !!pickedCropId && Number(itemGrossWeight) > 0 && Number(itemRate) > 0;
 
@@ -172,6 +199,8 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     setExpenses([{ expense_type: '', amount: '', is_income: false, notes: '' }]);
     setInvoiceNotes('');
     setVehicleNumber('');
+    setPaymentMode(null);
+    setPartialAmount('');
     setErrorMsg('');
     setMobileTab('items');
     setJustAddedMsg(false);
@@ -182,6 +211,19 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     const supplierId = selectedSupplierId;
     if (supplierId === null) { setErrorMsg('Please select a supplier.'); return; }
     if (!cart.length) { setErrorMsg('Add at least one item.'); return; }
+    if (grandTotal < 0) { setErrorMsg('The expenses are larger than the purchase total.'); return; }
+    if (!paymentMode) { setErrorMsg('Choose a payment option: full, partial or no payment.'); return; }
+    if (paymentMode === 'partial') {
+      if (!partialAmount || Number(partialAmount) < 0 || !Number.isFinite(Number(partialAmount))) {
+        setErrorMsg('Enter the amount paid (0 or more).');
+        return;
+      }
+      if (amountPaid > grandTotal) {
+        setErrorMsg('Amount paid cannot be more than the purchase total.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setErrorMsg('');
 
@@ -195,6 +237,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
       expenses: validExpenses,
       vehicle_number: vehicleNumber || undefined,
       notes: invoiceNotes,
+      amount_paid: amountPaid,
     });
 
     setIsSubmitting(false);
@@ -226,6 +269,8 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
         totalCropAmount: cartTotal,
         totalExpensesNet,
         totalExpensesDisplay,
+        amountPaid,
+        remainingDue,
       });
       resetAll();
       if (onSuccess) onSuccess();
@@ -323,6 +368,10 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                 <span className="font-bold text-sm">Grand Total</span>
                 <span className="text-xl font-extrabold">Rs. {(receipt.totalCropAmount + receipt.totalExpensesNet).toLocaleString()}</span>
               </div>
+              <div className="space-y-0.5 text-xs">
+                <div className="flex justify-between"><span className="text-slate-600">Amount paid</span><span className="font-bold text-blue-700">Rs. {receipt.amountPaid.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">Remaining payable</span><span className={`font-extrabold ${receipt.remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'}`}>Rs. {receipt.remainingDue.toLocaleString()}</span></div>
+              </div>
               <p className="text-center text-[10px] text-slate-400 border-t border-dashed border-slate-200 pt-2">Computer-generated receipt</p>
             </div>
 
@@ -410,7 +459,12 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                   <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">{selectedSupplier.name.charAt(0)}</div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-slate-900 leading-tight truncate">{selectedSupplier.name}</p>
-                    {selectedSupplier.phone && <p className="text-[11px] text-slate-500 truncate">{selectedSupplier.phone}</p>}
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {selectedSupplier.phone || 'No phone'}
+                      {selectedSupplier.outstanding !== undefined && selectedSupplier.outstanding !== null && (
+                        <> · Balance {selectedSupplier.outstanding < 0 ? `due to supplier Rs. ${fmt(-selectedSupplier.outstanding)}` : selectedSupplier.outstanding > 0 ? `receivable Rs. ${fmt(selectedSupplier.outstanding)}` : 'Rs. 0'}</>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <button onClick={() => { setSelectedSupplierId(null); setSupplierSearch(''); }} aria-label="Change supplier" className="text-slate-300 hover:text-rose-500 transition shrink-0"><X className="w-4 h-4" /></button>
@@ -427,7 +481,14 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                         <button key={s.id} type="button" onClick={() => { setSelectedSupplierId(s.id); setSupplierSearch(''); }}
                           className="w-full text-left px-3 py-1.5 hover:bg-slate-50 border-b border-slate-100 last:border-0">
                           <p className="text-sm font-semibold">{s.name}</p>
-                          {s.phone && <p className="text-[11px] text-slate-400">{s.phone}</p>}
+                          <p className="text-[11px] text-slate-400">
+                            {s.phone ? `${s.phone} · ` : ''}
+                            {s.outstanding !== undefined && s.outstanding !== null
+                              ? s.outstanding < 0
+                                ? `Payable: Rs. ${fmt(-s.outstanding)}`
+                                : `Balance: Rs. ${fmt(s.outstanding)}`
+                              : ''}
+                          </p>
                         </button>
                       ))}
                   </div>
@@ -545,19 +606,78 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                 onChange={(e) => setInvoiceNotes(e.target.value)}
                 className={INPUT} />
             </div>
-            {cart.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-blue-700 font-semibold">Grand Total</p>
-                  {totalExpensesDisplay > 0 && (
-                    <p className="text-[10px] text-blue-600">
-                      Crops {totalExpensesNet >= 0 ? '+' : ''} Rs. {totalExpensesNet.toLocaleString()} expenses
-                    </p>
-                  )}
-                </div>
-                <span className="text-lg font-extrabold text-blue-900">Rs. {(cartTotal + totalExpensesNet).toLocaleString()}</span>
+            {/* Payment (Full, Partial, Total Credit) */}
+            <div className={`${CARD} shrink-0`}>
+              <div className={CARD_HEAD}>
+                <Wallet className="w-3.5 h-3.5 text-slate-500" />
+                <span className={CARD_TITLE}>Payment Method <span className="text-rose-500">*</span></span>
               </div>
-            )}
+              <div className="p-2.5 space-y-2">
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'full' as PaymentMode, title: 'Full payment' },
+                    { id: 'partial' as PaymentMode, title: 'Partial payment' },
+                    { id: 'none' as PaymentMode, title: 'Credit (No payment)' },
+                  ].map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setPaymentMode(o.id)}
+                      className={`py-1.5 rounded-md border text-xs font-bold transition ${
+                        paymentMode === o.id
+                          ? 'border-blue-600 bg-blue-50 text-blue-800'
+                          : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {o.title}
+                    </button>
+                  ))}
+                </div>
+
+                {paymentMode === 'partial' && (
+                  <div>
+                    <label className={LABEL}>Amount paid now to supplier (PKR)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      placeholder="0"
+                      value={partialAmount}
+                      onChange={(e) => setPartialAmount(e.target.value)}
+                      className={`${INPUT} ${partialInvalid ? 'border-rose-400' : ''}`}
+                    />
+                    {partialInvalid && (
+                      <p className="mt-0.5 text-xs text-rose-600">Amount must be between 0 and the purchase total.</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-1.5 text-center">
+                  <div className="rounded-md bg-slate-50 border border-slate-200 py-1.5">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide">Total</p>
+                    <p className="text-xs font-bold text-slate-900">Rs. {fmt(grandTotal)}</p>
+                  </div>
+                  <div className="rounded-md bg-slate-50 border border-slate-200 py-1.5">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide">Paid Now</p>
+                    <p className="text-xs font-bold text-blue-700">Rs. {fmt(amountPaid)}</p>
+                  </div>
+                  <div className="rounded-md bg-slate-50 border border-slate-200 py-1.5">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide">Remaining Due</p>
+                    <p className={`text-xs font-extrabold ${remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                      Rs. {fmt(remainingDue)}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedSupplier && selectedSupplier.outstanding !== undefined && selectedSupplier.outstanding !== null && paymentMode && (
+                  <p className="text-[10px] text-slate-500 bg-slate-50 rounded p-1.5 border border-slate-100">
+                    Supplier's Khata after this purchase: <span className="font-bold">
+                      Rs. {fmt(selectedSupplier.outstanding - remainingDue)}
+                    </span> {selectedSupplier.outstanding - remainingDue < 0 ? '(payable by shop)' : '(receivable by shop)'}
+                  </p>
+                )}
+              </div>
+            </div>
             {errorMsg && (
               <div className="flex items-start gap-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-md font-medium">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{errorMsg}

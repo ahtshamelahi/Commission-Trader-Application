@@ -18,12 +18,18 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     async function loadPurchasesData() {
-      const [cropsRes, varietiesRes, suppliersRes, purchasesRes] = await Promise.all([
+      const [cropsRes, varietiesRes, suppliersRes, purchasesRes, balancesRes] = await Promise.all([
         supabase.from('crops').select('*').order('name', { ascending: true }),
         supabase.from('crop_varieties').select('*').order('name', { ascending: true }),
         supabase.from('parties').select('*').or('party_type.eq.supplier,party_type.eq.both').order('name', { ascending: true }),
         supabase.from('purchases').select('*, crops(name), parties(name)').order('created_at', { ascending: false }).limit(100),
+        supabase.from('party_balances').select('party_id, balance'),
       ]);
+
+      const balanceMap = new Map<number, number>();
+      if (!balancesRes.error && Array.isArray(balancesRes.data)) {
+        balancesRes.data.forEach((r: any) => balanceMap.set(Number(r.party_id), Number(r.balance)));
+      }
 
       const varieties: CropVariety[] = (varietiesRes.data as any) || [];
       const structuredCrops: Crop[] = ((cropsRes.data as any[]) || []).map((c) => ({
@@ -31,8 +37,13 @@ export default function PurchasesPage() {
         varieties: varieties.filter((v) => v.crop_id === c.id),
       }));
 
+      const structuredSuppliers: (Party & { outstanding?: number | null })[] = ((suppliersRes.data as any[]) || []).map((s) => ({
+        ...s,
+        outstanding: balanceMap.has(s.id) ? balanceMap.get(s.id)! : (s.balance !== undefined ? Number(s.balance) : null),
+      }));
+
       setCrops(structuredCrops);
-      setSuppliers(suppliersRes.data || []);
+      setSuppliers(structuredSuppliers);
       setPurchases(purchasesRes.data || []);
       setIsLoading(false);
     }

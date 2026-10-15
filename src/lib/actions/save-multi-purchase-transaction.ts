@@ -26,6 +26,7 @@ export interface MultiPurchaseInput {
   expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
   vehicle_number?: string;
   notes?: string;
+  amount_paid?: number;
 }
 
 export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
@@ -126,10 +127,11 @@ export async function saveMultiPurchaseTransaction(input: MultiPurchaseInput) {
       0
     );
     const documentTotal = round2(itemsTotal + expNet);
+    const amountPaid = Math.max(0, round2(Number(input.amount_paid) || 0));
     if (insertedIds[0]) {
       await supabase
         .from('purchases')
-        .update({ document_total: documentTotal, amount_paid: 0 })
+        .update({ document_total: documentTotal, amount_paid: amountPaid })
         .eq('id', insertedIds[0]);
     }
 
