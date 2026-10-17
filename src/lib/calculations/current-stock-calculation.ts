@@ -15,7 +15,7 @@ function toKg(value: unknown): number {
  * Sum signed movement quantities (purchase +, sale −, adjustment ±).
  */
 export function calculateAvailableStock(
-  movements: Array<{ quantity_kg: number | string }>
+  movements: Array<{ quantity_kg?: number | string | null }>
 ): number {
   const total = movements.reduce((acc, m) => acc + toKg(m.quantity_kg), 0);
   return r3(total);
