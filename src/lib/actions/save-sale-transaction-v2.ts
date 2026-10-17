@@ -24,6 +24,7 @@ export interface SaleV2Input {
   num_bags: number;
   price_per_bag_pkr: number;
   commission_pct: number;
+  kunda_amount_pkr?: number;
   payment_mode?: 'full' | 'partial' | 'none';
   amount_received?: number;
   notes?: string;
@@ -57,6 +58,8 @@ export async function saveSaleTransactionV2(
     return { success: false, message: 'Price per bag cannot be negative.' };
   if (input.commission_pct < 0)
     return { success: false, message: 'Commission % cannot be negative.' };
+  if ((input.kunda_amount_pkr || 0) < 0)
+    return { success: false, message: 'Kunda deduction cannot be negative.' };
 
   const supabase = await getSupabaseServerClient();
 
@@ -103,7 +106,8 @@ export async function saveSaleTransactionV2(
     input.price_per_40kg,
     input.num_bags,
     input.price_per_bag_pkr,
-    input.commission_pct
+    input.commission_pct,
+    input.kunda_amount_pkr || 0
   );
 
   const grandTotal = calc.finalAmountReceivablePkr;
@@ -201,6 +205,15 @@ export async function saveSaleTransactionV2(
         amount: r2(calc.commissionAmountPkr),
         is_income: true,
         notes: `${input.commission_pct}% commission`,
+      });
+    }
+    if ((input.kunda_amount_pkr || 0) > 0) {
+      saleExpenseRows.push({
+        sale_id: saleId,
+        expense_type: 'Kunda',
+        amount: r2(input.kunda_amount_pkr!),
+        is_income: false,
+        notes: 'Kunda deduction',
       });
     }
     if (saleExpenseRows.length > 0) {

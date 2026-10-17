@@ -80,12 +80,12 @@ interface ReceiptData {
 // ── style tokens (compact) ────────────────────────────────────────────────────
 const FIELD_LABEL = 'block mb-0.5 text-xs text-slate-500';
 const INPUT =
-  'h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-900 placeholder:text-slate-400 ' +
+  'h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-900 text-left tabular-nums placeholder:text-slate-400 ' +
   'focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 ' +
   'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400';
 const INPUT_ERR = 'border-rose-400 focus:border-rose-500 focus:ring-rose-500';
 const SELECT = `${INPUT} appearance-none pr-7 cursor-pointer`;
-const NUM = 'text-right tabular-nums';
+const NUM = 'text-left tabular-nums';
 const RECEIPT_ROW = 'flex items-center justify-between gap-3 border-b border-slate-100 py-1 text-xs last:border-0';
 const RECEIPT_LABEL = 'text-slate-500';
 const RECEIPT_VALUE = 'font-medium tabular-nums text-slate-800';
@@ -241,7 +241,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
   const effBardanaBasisKg = actualWeightNum > 0 ? actualWeightNum : 40;
 
   // The Touch AMOUNT (Rs.) is a flat rupee deduction from the crop amount, so it is added to
-  // the flat deduction (kunda) that the calc already subtracts from the total.
+  // the flat deduction (kunda) that the calc subtracts from the total.
   const effKundaAmount = safeNum(kundaAmount) + touchAmountNum;
 
   // live calculations — run on every render from controlled inputs
@@ -493,7 +493,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                 <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1">
                   <p className="mb-0.5 text-[11px] font-semibold text-slate-500">Other charges</p>
                   {receipt.kundaAmountPkr > 0 && (
-                    <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Kunda</span><span className={RECEIPT_VALUE}>{fmtRs(receipt.kundaAmountPkr)}</span></div>
+                    <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Kunda deduction</span><span className={`${RECEIPT_VALUE} text-rose-700`}>− {fmtRs(receipt.kundaAmountPkr)}</span></div>
                   )}
                   {receipt.numBags > 0 && (
                     <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Bags ({receipt.numBags} × {fmtRs(receipt.pricePerBagPkr)})</span><span className={RECEIPT_VALUE}>{fmtRs(receipt.totalBagAmountPkr)}</span></div>
@@ -772,7 +772,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                     value={touchNote}
                     disabled={!hasTouch}
                     onChange={(e) => setTouchNote(e.target.value)}
-                    className={INPUT}
+                    className={`${INPUT} text-left`}
                   />
                 </Field>
               </div>
@@ -879,8 +879,8 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                         title={m.desc}
                         onClick={() => setPaymentMode(m.id)}
                         className={`border-l border-slate-300 px-2 text-xs font-medium first:border-l-0 ${paymentMode === m.id
-                            ? 'bg-blue-700 text-white'
-                            : 'bg-white text-slate-600 hover:bg-slate-50'
+                          ? 'bg-blue-700 text-white'
+                          : 'bg-white text-slate-600 hover:bg-slate-50'
                           }`}
                       >
                         {m.title}
@@ -916,7 +916,7 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
                     placeholder="e.g. Paid via cash, Truck # 1234"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className={INPUT}
+                    className={`${INPUT} text-left`}
                   />
                 </Field>
               </div>
@@ -977,7 +977,11 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
               {touchAmountNum > 0 && (
                 <SummaryRow label="Touch (amount) deducted" value={`− ${fmtRs(touchAmountNum)}`} tone="text-rose-600" />
               )}
-              <SummaryRow label="Kunda" value={fmtRs(safeNum(kundaAmount))} />
+              <SummaryRow
+                label="Kunda deduction"
+                value={safeNum(kundaAmount) > 0 ? `− ${fmtRs(safeNum(kundaAmount))}` : fmtRs(0)}
+                tone={safeNum(kundaAmount) > 0 ? 'text-rose-700' : 'text-slate-800'}
+              />
               <SummaryRow label="Bag amount" value={fmtRs(calc.totalBagAmountPkr)} />
 
               <div className="mt-1 flex items-baseline justify-between border-t-2 border-slate-300 pt-1">

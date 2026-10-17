@@ -20,11 +20,11 @@ test('purchase example: 400 kg @ 3000/40 with 1.25 kg/40 deduction', () => {
   assert.equal(r.physicalStockToAddKg, 400);
 });
 
-test('purchase total adds net-weight price, flat kunda, and bag cost once', () => {
+test('purchase total deducts flat kunda and adds net-weight price and bag cost', () => {
   const r = performPurchaseCalculations(400, 1.25, 3000, 100, 10, 25);
   assert.equal(r.cropPaymentPkr, 29062.5);
   assert.equal(r.totalBagAmountPkr, 250);
-  assert.equal(r.totalPurchaseAmountPkr, 29412.5);
+  assert.equal(r.totalPurchaseAmountPkr, 29212.5);
 });
 
 test('purchase deduction and bardana use independently selected weight bases', () => {

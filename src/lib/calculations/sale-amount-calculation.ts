@@ -13,7 +13,9 @@ export interface SaleCalculationResult {
   baseSaleAmountPkr: number;
   /** baseSaleAmountPkr * commissionPct / 100 */
   commissionAmountPkr: number;
-  /** baseSaleAmountPkr + commissionAmountPkr */
+  /** flat kunda deduction in PKR */
+  kundaAmountPkr: number;
+  /** baseSaleAmountPkr + commissionAmountPkr - kundaAmountPkr */
   finalAmountReceivablePkr: number;
   /** = actualWeightSold (inventory reduction) */
   physicalStockToRemoveKg: number;
@@ -31,7 +33,8 @@ const r3 = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000;
  * total_bag_revenue        = num_bags × price_per_bag
  * base_sale_amount         = crop_sale_amount + total_bag_revenue
  * commission_amount        = base_sale_amount × commission_pct / 100
- * final_amount_receivable  = base_sale_amount + commission_amount
+ * kunda_deduction          = flat amount (subtracted from bill)
+ * final_amount_receivable  = base_sale_amount + commission_amount - kunda_deduction
  * physical_stock_to_remove = actual_weight_sold
  */
 export function performSaleCalculations(
@@ -40,7 +43,8 @@ export function performSaleCalculations(
   pricePerUnit40Kg: number,
   numBags: number = 0,
   pricePerBagPkr: number = 0,
-  commissionPct: number = 0
+  commissionPct: number = 0,
+  kundaAmountPkr: number = 0
 ): SaleCalculationResult {
   const aw = Math.max(0, actualWeightSoldKg);
   const bd = Math.max(0, bardanaDeductionKg);
@@ -54,7 +58,10 @@ export function performSaleCalculations(
   const baseSaleAmountPkr = r2(cropSaleAmountPkr + totalBagRevenuePkr);
   const pct = Math.max(0, commissionPct);
   const commissionAmountPkr = pct > 0 ? r2((baseSaleAmountPkr * pct) / 100) : 0;
-  const finalAmountReceivablePkr = r2(baseSaleAmountPkr + commissionAmountPkr);
+  const kunda = r2(Math.max(0, kundaAmountPkr));
+  const finalAmountReceivablePkr = r2(
+    Math.max(0, baseSaleAmountPkr + commissionAmountPkr - kunda)
+  );
 
   return {
     bardanaDeductionKg: bd,
@@ -63,6 +70,7 @@ export function performSaleCalculations(
     totalBagRevenuePkr,
     baseSaleAmountPkr,
     commissionAmountPkr,
+    kundaAmountPkr: kunda,
     finalAmountReceivablePkr,
     physicalStockToRemoveKg: r3(aw),
   };

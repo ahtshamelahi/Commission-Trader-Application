@@ -76,6 +76,7 @@ interface ReceiptData {
   baseSaleAmountPkr: number;
   commissionPct: number;
   commissionAmountPkr: number;
+  kundaAmountPkr: number;
   finalAmountReceivablePkr: number;
   paymentMode: PaymentMode;
   amountReceived: number;
@@ -88,14 +89,14 @@ interface ReceiptData {
 // ── style tokens (compact) ────────────────────────────────────────────────────
 const FIELD_LABEL = 'block mb-0.5 text-xs text-slate-500';
 const INPUT =
-  'h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-900 placeholder:text-slate-400 ' +
+  'h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-900 text-left tabular-nums placeholder:text-slate-400 ' +
   'focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 ' +
   'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400';
 const INPUT_ERR = 'border-rose-400 focus:border-rose-500 focus:ring-rose-500';
 const SELECT = `${INPUT} appearance-none pr-7 cursor-pointer`;
-const NUM = 'text-right tabular-nums';
+const NUM = 'text-left tabular-nums';
 const READONLY =
-  'flex h-8 items-center justify-end rounded border border-slate-200 bg-slate-50 px-2 text-[13px] font-semibold tabular-nums text-slate-800';
+  'flex h-8 items-center justify-start rounded border border-slate-200 bg-slate-50 px-2 text-[13px] font-semibold tabular-nums text-slate-800';
 const RECEIPT_ROW = 'flex items-center justify-between gap-3 border-b border-slate-100 py-1 text-xs last:border-0';
 const RECEIPT_LABEL = 'text-slate-500';
 const RECEIPT_VALUE = 'font-medium tabular-nums text-slate-800';
@@ -204,6 +205,9 @@ export function SaleEntryForm({
   // ── commission ────────────────────────────────────────────────────────────
   const [commissionPct, setCommissionPct] = useState('0');
 
+  // ── kunda (flat deduction from bill) ──────────────────────────────────────
+  const [kundaAmount, setKundaAmount] = useState('0');
+
   // ── payment & khata ────────────────────────────────────────────────────────
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('full');
   const [partialAmount, setPartialAmount] = useState('');
@@ -293,7 +297,8 @@ export function SaleEntryForm({
     safeNum(pricePerUnit),
     Math.max(0, Math.floor(safeNum(numBags))),
     safeNum(pricePerBag),
-    safeNum(commissionPct)
+    safeNum(commissionPct),
+    safeNum(kundaAmount)
   );
 
   // values shown to the user (kept separate so bardana / touch are not mixed up)
@@ -338,6 +343,7 @@ export function SaleEntryForm({
     if (safeNum(numBags) < 0) e.numBags = 'Bags cannot be negative.';
     if (safeNum(pricePerBag) < 0) e.pricePerBag = 'Price per bag cannot be negative.';
     if (safeNum(commissionPct) < 0) e.commissionPct = 'Commission cannot be negative.';
+    if (safeNum(kundaAmount) < 0) e.kundaAmount = 'Kunda deduction cannot be negative.';
 
     // touch: amount OR weight (never both), never negative, never more than what is left
     if (safeNum(touchAmount) < 0) e.touchAmount = 'Touch amount cannot be negative.';
@@ -369,7 +375,7 @@ export function SaleEntryForm({
 
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [saleDate, cropId, actualWeightSold, isStockInsufficient, availableStockKg, bardanaTotalKg, pricePerUnit, numBags, pricePerBag, commissionPct, touchAmount, touchWeightKg, cropSaleBeforeTouch, paymentMode, partialAmount, grandTotal]);
+  }, [saleDate, cropId, actualWeightSold, isStockInsufficient, availableStockKg, bardanaTotalKg, pricePerUnit, numBags, pricePerBag, commissionPct, kundaAmount, touchAmount, touchWeightKg, cropSaleBeforeTouch, paymentMode, partialAmount, grandTotal]);
 
   // ── submit ─────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -394,6 +400,7 @@ export function SaleEntryForm({
       num_bags: Math.max(0, Math.floor(safeNum(numBags))),
       price_per_bag_pkr: safeNum(pricePerBag),
       commission_pct: safeNum(commissionPct),
+      kunda_amount_pkr: safeNum(kundaAmount),
       payment_mode: paymentMode,
       amount_received: amountReceived,
       notes: combinedNotes || undefined,
@@ -423,6 +430,7 @@ export function SaleEntryForm({
         baseSaleAmountPkr: calc.baseSaleAmountPkr,
         commissionPct: safeNum(commissionPct),
         commissionAmountPkr: calc.commissionAmountPkr,
+        kundaAmountPkr: calc.kundaAmountPkr,
         finalAmountReceivablePkr: calc.finalAmountReceivablePkr,
         paymentMode,
         amountReceived: res.amountReceived ?? amountReceived,
@@ -446,6 +454,7 @@ export function SaleEntryForm({
       setNumBags('0');
       setPricePerBag('0');
       setCommissionPct('0');
+      setKundaAmount('0');
       setPaymentMode('full');
       setPartialAmount('');
       setNotes('');
@@ -527,6 +536,9 @@ export function SaleEntryForm({
                   )}
                   {receipt.commissionAmountPkr > 0 && (
                     <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Buyer commission ({receipt.commissionPct}%)</span><span className="font-medium tabular-nums text-violet-700">+ {fmtRs(receipt.commissionAmountPkr)}</span></div>
+                  )}
+                  {receipt.kundaAmountPkr > 0 && (
+                    <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Kunda deduction</span><span className="font-medium tabular-nums text-rose-700">− {fmtRs(receipt.kundaAmountPkr)}</span></div>
                   )}
                 </div>
               )}
@@ -793,7 +805,7 @@ export function SaleEntryForm({
                     value={touchNote}
                     disabled={!hasTouch}
                     onChange={(e) => setTouchNote(e.target.value)}
-                    className={INPUT}
+                    className={`${INPUT} text-left`}
                   />
                 </Field>
               </div>
@@ -895,6 +907,32 @@ export function SaleEntryForm({
               </p>
             </Section>
 
+            {/* ── Kunda deduction ──────────────────────────────────────── */}
+            <Section title="Kunda deduction (optional)">
+              <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5 md:grid-cols-4">
+                <Field label="Kunda amount (Rs.)" htmlFor="sale-kunda" error={errors.kundaAmount} hint="Flat deduction from bill">
+                  <input
+                    id="sale-kunda"
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="0"
+                    value={kundaAmount}
+                    onChange={(e) => setKundaAmount(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.kundaAmount ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <div className="min-w-0">
+                  <span className={FIELD_LABEL}>Final receivable (after kunda)</span>
+                  <div className={`${READONLY} text-slate-900 font-bold`}>{fmtRs(calc.finalAmountReceivablePkr)}</div>
+                </div>
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                Kunda is subtracted from the final bill. Leave 0 if no kunda deduction applies.
+              </p>
+            </Section>
+
             {/* ── Payment method & khata ──────────────────────────────────── */}
             <Section title="Payment & buyer khata">
               <div className="grid grid-cols-1 gap-x-2.5 gap-y-1.5 md:grid-cols-12">
@@ -955,7 +993,7 @@ export function SaleEntryForm({
                     placeholder="e.g. Paid via cash, bank transfer ref"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className={INPUT}
+                    className={`${INPUT} text-left`}
                   />
                 </Field>
               </div>
@@ -1018,6 +1056,13 @@ export function SaleEntryForm({
                   label={`Commission (${safeNum(commissionPct)}%)`}
                   value={`+ ${fmtRs(calc.commissionAmountPkr)}`}
                   tone="text-violet-700"
+                />
+              )}
+              {safeNum(kundaAmount) > 0 && (
+                <SummaryRow
+                  label="Kunda deduction"
+                  value={`− ${fmtRs(calc.kundaAmountPkr)}`}
+                  tone="text-rose-700"
                 />
               )}
 

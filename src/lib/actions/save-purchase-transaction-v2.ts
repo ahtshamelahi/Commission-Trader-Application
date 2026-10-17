@@ -168,8 +168,8 @@ export async function savePurchaseTransactionV2(
         purchase_id: purchaseId,
         expense_type: 'Kunda',
         amount: r2(input.kunda_amount_pkr),
-        is_income: false,
-        notes: 'Kunda',
+        is_income: true,
+        notes: 'Kunda deduction',
       });
     }
     if (calc.totalBagAmountPkr > 0) {

@@ -11,7 +11,7 @@ export interface PurchaseCalculationResult {
   cropPaymentPkr: number;
   /** numBags * pricePerBag */
   totalBagAmountPkr: number;
-  /** cropPaymentPkr + kundaAmountPkr + totalBagAmountPkr */
+  /** cropPaymentPkr - kundaAmountPkr + totalBagAmountPkr */
   totalPurchaseAmountPkr: number;
   /** = actual_weight_kg (for inventory) */
   physicalStockToAddKg: number;
@@ -53,8 +53,8 @@ export function calculateStoredPurchaseTotalPkr(
  * net_payable_weight = actual_weight − deduction_weight − bardana_weight
  * crop_payment       = (net_payable_weight ÷ 40) × price_per_40kg
  * total_bag_amount   = num_bags × price_per_bag
- * kunda              = flat amount (no multiplication)
- * total_purchase     = crop_payment + kunda + total_bag_amount
+ * kunda              = flat amount (no multiplication, subtracted from payable)
+ * total_purchase     = crop_payment - kunda + total_bag_amount
  * physical_stock     = actual_weight (inventory uses gross received)
  */
 export function performPurchaseCalculations(
@@ -87,7 +87,9 @@ export function performPurchaseCalculations(
       : 0;
   const totalBagAmountPkr = r2(Math.max(0, numBags) * Math.max(0, pricePerBagPkr));
   const kunda = r2(Math.max(0, kundaAmountPkr));
-  const totalPurchaseAmountPkr = r2(cropPaymentPkr + kunda + totalBagAmountPkr);
+  const totalPurchaseAmountPkr = r2(
+    Math.max(0, cropPaymentPkr - kunda + totalBagAmountPkr)
+  );
 
   return {
     deductionWeightKg,

@@ -34,8 +34,8 @@ export function calculatePhysicalStockKg(input: {
 }): number {
   return r3(
     toKg(input.purchasedGrossKg) -
-      toKg(input.soldPhysicalKg) +
-      toKg(input.adjustmentKg ?? 0)
+    toKg(input.soldPhysicalKg) +
+    toKg(input.adjustmentKg ?? 0)
   );
 }
 
