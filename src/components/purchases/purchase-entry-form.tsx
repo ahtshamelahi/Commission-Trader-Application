@@ -1,18 +1,40 @@
 'use client';
 
 // components/purchases/purchase-entry-form.tsx
-import React, { useState } from 'react';
+// Spec-A: deduction-rate model, kunda (flat), bags section, stock preview,
+// AND full Payment Method (Full / Partial / Credit) with Khata balance calculation.
+// Bardana: user enters TOTAL bardana weight (kg), which is subtracted from actual weight.
+// Touch: user enters EITHER an amount (Rs.) deducted from the crop amount after bardana,
+//        OR a weight (kg) deducted from the weight after bardana. Optional touch note.
+//
+// UI (v3): dense 12-column grid. Inputs on the left in three blocks, sticky summary + save on the right.
+// Only layout / styling changed vs. v2. All state, calculations, validation and saving are untouched.
+
+import React, { useState, useCallback } from 'react';
 import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 import { performPurchaseCalculations } from '@/lib/calculations/purchase-amount-calculation';
-import { saveMultiPurchaseTransaction, MultiPurchaseItem } from '@/lib/actions/save-multi-purchase-transaction';
-import {
-  CheckCircle2, AlertCircle, Loader2, User, Download, X,
-  Store, Sprout, Trash2, Plus, Phone, ShoppingCart, Wallet,
-} from 'lucide-react';
+import { savePurchaseTransactionV2 } from '@/lib/actions/save-purchase-transaction-v2';
+import { CheckCircle2, AlertCircle, Loader2, X, Download, ChevronDown } from 'lucide-react';
 
+// ── helpers ──────────────────────────────────────────────────────────────────
+const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+const r3 = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000;
+
+function safeNum(v: string, fallback = 0) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function fmtKg(n: number) {
+  return `${n.toLocaleString('en-PK', { maximumFractionDigits: 3 })} kg`;
+}
+function fmtRs(n: number) {
+  return `Rs. ${n.toLocaleString('en-PK', { maximumFractionDigits: 2 })}`;
+}
+
+// ── types ─────────────────────────────────────────────────────────────────────
 export interface SupplierOption extends Party {
-  /** outstanding Khata balance; null when it could not be loaded */
   outstanding?: number | null;
 }
 
@@ -22,222 +44,323 @@ interface PurchaseEntryFormProps {
   onSuccess?: () => void;
 }
 
-interface CartItem extends MultiPurchaseItem {
-  _key: string;
-  commissionWeightKg: number;
-  bardanaWeightKg: number;
-  netWeightKg: number;
-  cropAmountPkr: number;
-}
-
-interface ReceiptItem {
-  cropName: string;
-  varietyName: string;
-  bags: number;
-  grossWeightKg: number;
-  commissionPer40kg: number;
-  commissionWeightKg: number;
-  bardanaPerBagKg: number;
-  bardanaWeightKg: number;
-  netWeightKg: number;
-  ratePer40kg: number;
-  cropAmountPkr: number;
-}
+type PaymentMode = 'full' | 'partial' | 'none';
 
 interface ReceiptData {
   invoiceNo: string;
   purchaseDate: string;
   supplierName: string;
-  supplierPhone: string;
-  vehicleNumber: string;
-  items: ReceiptItem[];
-  expenses: { expense_type: string; amount: number; is_income: boolean; notes: string }[];
-  totalCropAmount: number;
-  totalExpensesNet: number;
-  totalExpensesDisplay: number;
+  cropName: string;
+  varietyName: string;
+  actualWeightKg: number;
+  deductionRate: number;
+  deductionBasisKg: number;
+  deductionWeightKg: number;
+  bardanaRate: number;
+  bardanaBasisKg: number;
+  bardanaWeightKg: number;
+  touchWeightKg: number;
+  touchAmountPkr: number;
+  touchNote: string;
+  netPayableWeightKg: number;
+  pricePerUnit: number;
+  cropAmountBeforeTouchPkr: number;
+  cropPaymentPkr: number;
+  kundaAmountPkr: number;
+  numBags: number;
+  pricePerBagPkr: number;
+  totalBagAmountPkr: number;
+  totalPurchaseAmountPkr: number;
+  physicalStockToAddKg: number;
+  paymentMode: PaymentMode;
   amountPaid: number;
   remainingDue: number;
 }
 
-type PaymentMode = 'full' | 'partial' | 'none';
+// ── style tokens (compact) ────────────────────────────────────────────────────
+const FIELD_LABEL = 'block mb-0.5 text-xs text-slate-500';
+const INPUT =
+  'h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-900 placeholder:text-slate-400 ' +
+  'focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 ' +
+  'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400';
+const INPUT_ERR = 'border-rose-400 focus:border-rose-500 focus:ring-rose-500';
+const SELECT = `${INPUT} appearance-none pr-7 cursor-pointer`;
+const NUM = 'text-right tabular-nums';
+const RECEIPT_ROW = 'flex items-center justify-between gap-3 border-b border-slate-100 py-1 text-xs last:border-0';
+const RECEIPT_LABEL = 'text-slate-500';
+const RECEIPT_VALUE = 'font-medium tabular-nums text-slate-800';
 
-const SHOP_NAME = 'M-Shafiq Commission Shop';
-const SHOP_TAGLINE = 'Crop Commission Agent — Grain & Commodity Trade';
+const today = () => new Date().toISOString().split('T')[0];
 
-const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
+// ── small layout helpers ──────────────────────────────────────────────────────
+function Field({
+  label,
+  htmlFor,
+  required,
+  error,
+  hint,
+  className,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  required?: boolean;
+  error?: string;
+  hint?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`min-w-0 ${className ?? ''}`}>
+      <label htmlFor={htmlFor} className={FIELD_LABEL}>
+        {label}
+        {required && <span className="text-rose-500"> *</span>}
+      </label>
+      {children}
+      {error ? (
+        <p className="mt-0.5 text-[11px] leading-tight text-rose-600">{error}</p>
+      ) : hint ? (
+        <p className="mt-0.5 text-[11px] leading-tight text-slate-400">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
 
-// shared compact styles (same look as the New Sale page)
-const CARD = 'bg-white border border-slate-200 rounded-lg';
-const CARD_HEAD = 'px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 rounded-t-lg';
-const CARD_TITLE = 'text-[11px] font-bold text-slate-600 uppercase tracking-wide';
-const LABEL = 'text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-0.5';
-const INPUT = 'w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
+function Section({
+  title,
+  aside,
+  children,
+}: {
+  title: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-b border-slate-200 px-3 py-2.5 last:border-b-0">
+      <h2 className="mb-1.5 flex h-4 items-center justify-between text-xs font-semibold text-slate-700">
+        <span>{title}</span>
+        {aside}
+      </h2>
+      {children}
+    </section>
+  );
+}
 
+function SummaryRow({
+  label,
+  value,
+  tone = 'text-slate-800',
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-0.5 text-xs">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className={`font-medium tabular-nums ${tone}`}>{value}</dd>
+    </div>
+  );
+}
+
+// ── component ─────────────────────────────────────────────────────────────────
 export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntryFormProps) {
-  // Supplier
-  const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
-  const [supplierSearch, setSupplierSearch] = useState('');
 
-  // Crop/Variety picker
-  const [pickedCropId, setPickedCropId] = useState<number | null>(null);
-  const [pickedVarietyId, setPickedVarietyId] = useState<number | null>(null);
+  // ── section 1: purchase info ───────────────────────────────────────────────
+  const [purchaseDate, setPurchaseDate] = useState(today());
+  const [supplierId, setSupplierId] = useState('');
+  const [cropId, setCropId] = useState('');
+  const [varietyId, setVarietyId] = useState('');
+  const [actualWeight, setActualWeight] = useState('');
 
-  // Item entry
-  const [itemBags, setItemBags] = useState('');
-  const [itemGrossWeight, setItemGrossWeight] = useState('');
-  const [itemCommission, setItemCommission] = useState('1.5');
-  const [itemRate, setItemRate] = useState('');
-  const [itemBardana, setItemBardana] = useState('');
+  // ── section 2: deduction + crop payment ───────────────────────────────────
+  const [deductionRate, setDeductionRate] = useState('0');
+  const [deductionBasisKg, setDeductionBasisKg] = useState('40');
+  const [bardanaTotalKg, setBardanaTotalKg] = useState('0'); // total bardana weight (kg)
+  const [pricePerUnit, setPricePerUnit] = useState('');
 
-  // Cart
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // touch (either amount OR weight) + note
+  const [touchAmount, setTouchAmount] = useState('');
+  const [touchWeightKg, setTouchWeightKg] = useState('');
+  const [touchNote, setTouchNote] = useState('');
 
-  // Expenses (multiple lines)
-  const [expenses, setExpenses] = useState<{ expense_type: string; amount: string; is_income: boolean; notes: string }[]>([
-    { expense_type: '', amount: '', is_income: false, notes: '' },
-  ]);
-  const [invoiceNotes, setInvoiceNotes] = useState('');
-  const [vehicleNumber, setVehicleNumber] = useState('');
+  // ── kunda ─────────────────────────────────────────────────────────────────
+  const [kundaAmount, setKundaAmount] = useState('0');
 
-  // Payment method (like in New Sale: full, partial, none)
-  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
+  // ── bags ──────────────────────────────────────────────────────────────────
+  const [numBags, setNumBags] = useState('0');
+  const [pricePerBag, setPricePerBag] = useState('0');
+
+  // ── payment & khata state ──────────────────────────────────────────────────
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('none');
   const [partialAmount, setPartialAmount] = useState('');
+  const [notes, setNotes] = useState('');
 
-  // UI
+  // ── ui state ──────────────────────────────────────────────────────────────
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
-  // Mobile tab state: 'items' (Crop & item entry) or 'cart' (Supplier & Cart & Finalize)
-  const [mobileTab, setMobileTab] = useState<'items' | 'cart'>('items');
-  const [justAddedMsg, setJustAddedMsg] = useState(false);
+  // ── derived ───────────────────────────────────────────────────────────────
+  const pickedCrop = crops.find((c) => c.id === Number(cropId)) || null;
+  const varieties: CropVariety[] = pickedCrop?.varieties || [];
+  const selectedSupplier = suppliers.find((s) => s.id === Number(supplierId)) || null;
 
-  const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId) || null;
-  const filteredSuppliers = suppliers.filter(
-    (s) => s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.phone || '').includes(supplierSearch)
-  );
-
-  const pickedCrop = crops.find((c) => c.id === pickedCropId) || null;
-  const pickedVarieties: CropVariety[] = pickedCrop?.varieties || [];
-  const pickedVariety = pickedVarieties.find((v) => v.id === pickedVarietyId) || null;
-
-  // Live calc for current item
-  const liveCalc = performPurchaseCalculations(
-    Number(itemGrossWeight) || 0,
-    Number(itemCommission) || 0,
-    Number(itemRate) || 0,
-    Number(itemBags) || 0,
-    Number(itemBardana) || 0
-  );
-
-  const cartTotal = cart.reduce((s, i) => s + i.cropAmountPkr, 0);
-  // Expenses: income ones ADD to total, regular ones SUBTRACT
-  const totalExpensesNet = expenses.reduce((s, e) => {
-    const amt = Number(e.amount) || 0;
-    return s + (e.is_income ? amt : -amt);
-  }, 0);
-  const totalExpensesDisplay = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-
-  const grandTotal = round2(cartTotal + totalExpensesNet);
-
-  // Payment amounts (update instantly with option / amount changes)
-  const amountPaid =
-    paymentMode === 'full' ? grandTotal
-    : paymentMode === 'partial' ? round2(Number(partialAmount) || 0)
-    : 0;
-  const remainingDue = round2(grandTotal - amountPaid);
-  const partialInvalid =
-    paymentMode === 'partial' && (amountPaid < 0 || amountPaid > grandTotal);
-
-  const isItemReady = !!pickedCropId && Number(itemGrossWeight) > 0 && Number(itemRate) > 0;
-
-  const handleAddToCart = () => {
-    if (!isItemReady || !pickedCrop) return;
-    const calc = performPurchaseCalculations(
-      Number(itemGrossWeight),
-      Number(itemCommission) || 0,
-      Number(itemRate),
-      Number(itemBags) || 0,
-      Number(itemBardana) || 0
-    );
-    setCart((prev) => [...prev, {
-      _key: `${Date.now()}`,
-      crop_id: pickedCrop.id,
-      variety_id: pickedVariety?.id || null,
-      crop_name: pickedCrop.name,
-      variety_name: pickedVariety?.name || '',
-      bags: Number(itemBags) || 0,
-      gross_weight_kg: Number(itemGrossWeight),
-      commission_per_40kg: Number(itemCommission) || 0,
-      rate_per_40kg: Number(itemRate),
-      bardana_per_bag_kg: Number(itemBardana) || 0,
-      commissionWeightKg: calc.commissionWeightKg,
-      bardanaWeightKg: calc.bardanaWeightKg,
-      netWeightKg: calc.netWeightKg,
-      cropAmountPkr: calc.cropAmountPkr,
-    }]);
-    setItemBags('');
-    setItemGrossWeight('');
-    setItemRate('');
-    setItemBardana('');
-    setErrorMsg('');
-    setJustAddedMsg(true);
+  const handleCropChange = (id: string) => {
+    setCropId(id);
+    setVarietyId(''); // reset variety when crop changes
   };
 
-  const resetAll = () => {
-    setSelectedSupplierId(null);
-    setSupplierSearch('');
-    setPickedCropId(null);
-    setPickedVarietyId(null);
-    setItemBags('');
-    setItemGrossWeight('');
-    setItemCommission('1.5');
-    setItemRate('');
-    setItemBardana('');
-    setCart([]);
-    setExpenses([{ expense_type: '', amount: '', is_income: false, notes: '' }]);
-    setInvoiceNotes('');
-    setVehicleNumber('');
-    setPaymentMode(null);
-    setPartialAmount('');
-    setErrorMsg('');
-    setMobileTab('items');
-    setJustAddedMsg(false);
+  // ── touch handlers (only one of amount / weight can be used) ──────────────
+  const handleTouchAmountChange = (v: string) => {
+    setTouchAmount(v);
+    // when touch becomes empty, also clear its note
+    if (!(safeNum(v) > 0) && !(safeNum(touchWeightKg) > 0)) setTouchNote('');
+  };
+  const handleTouchWeightChange = (v: string) => {
+    setTouchWeightKg(v);
+    if (!(safeNum(v) > 0) && !(safeNum(touchAmount) > 0)) setTouchNote('');
+  };
+  const clearTouch = () => {
+    setTouchAmount('');
+    setTouchWeightKg('');
+    setTouchNote('');
   };
 
-  const handleFinalize = async () => {
-    // Supplier is mandatory — narrow the type from `number | null` to `number`
-    const supplierId = selectedSupplierId;
-    if (supplierId === null) { setErrorMsg('Please select a supplier.'); return; }
-    if (!cart.length) { setErrorMsg('Add at least one item.'); return; }
-    if (grandTotal < 0) { setErrorMsg('The expenses are larger than the purchase total.'); return; }
-    if (!paymentMode) { setErrorMsg('Choose a payment option: full, partial or no payment.'); return; }
+  // Total bardana weight entered by user, converted to the rate/basis the calc expects.
+  // The Touch WEIGHT (kg) is also a weight deduction after bardana, so it is added to the
+  // same total:  rate = (bardana kg + touch kg), basis = actual weight
+  //              =>  actual × rate ÷ basis = bardana kg + touch kg
+  const actualWeightNum = safeNum(actualWeight);
+  const bardanaKgNum = Math.max(0, safeNum(bardanaTotalKg));
+  const touchKgNum = Math.max(0, safeNum(touchWeightKg));
+  const touchAmountNum = Math.max(0, safeNum(touchAmount));
+  const hasTouch = touchKgNum > 0 || touchAmountNum > 0;
+
+  const effBardanaRate = actualWeightNum > 0 ? bardanaKgNum + touchKgNum : 0;
+  const effBardanaBasisKg = actualWeightNum > 0 ? actualWeightNum : 40;
+
+  // The Touch AMOUNT (Rs.) is a flat rupee deduction from the crop amount, so it is added to
+  // the flat deduction (kunda) that the calc already subtracts from the total.
+  const effKundaAmount = safeNum(kundaAmount) + touchAmountNum;
+
+  // live calculations — run on every render from controlled inputs
+  const calc = performPurchaseCalculations(
+    safeNum(actualWeight),
+    safeNum(deductionRate),
+    safeNum(pricePerUnit),
+    effKundaAmount,
+    Math.max(0, Math.floor(safeNum(numBags))),
+    safeNum(pricePerBag),
+    safeNum(deductionBasisKg),
+    effBardanaRate,
+    effBardanaBasisKg
+  );
+
+  // values shown to the user (kept separate so bardana / touch / kunda are not mixed up)
+  const bardanaShownKg = actualWeightNum > 0 ? bardanaKgNum : 0;
+  const cropAmountBeforeTouch = calc.cropPaymentPkr; // after bardana + touch weight
+  const cropPaymentAfterTouch = r2(cropAmountBeforeTouch - touchAmountNum); // after touch amount too
+
+  const grandTotal = calc.totalPurchaseAmountPkr;
+
+  // Live payment numbers
+  let amountPaid = 0;
+  if (paymentMode === 'full') {
+    amountPaid = grandTotal;
+  } else if (paymentMode === 'partial') {
+    amountPaid = Math.max(0, Math.min(grandTotal, safeNum(partialAmount)));
+  } else {
+    amountPaid = 0;
+  }
+  const remainingDue = Math.max(0, r2(grandTotal - amountPaid));
+
+  // Current supplier balance
+  // In the Khata system: balance < 0 means shop owes supplier (payable). balance > 0 means supplier owes shop.
+  const currentOutstanding = selectedSupplier?.outstanding ?? 0;
+  // If we purchase on credit (remainingDue > 0), shop owes more to the supplier:
+  // new balance = currentOutstanding - remainingDue
+  const projectedBalance = currentOutstanding - remainingDue;
+
+  // ── field-level validation ─────────────────────────────────────────────────
+  const deductionWeightKgCalc = calc.deductionWeightKg;
+
+  const validate = useCallback((): boolean => {
+    const e: Record<string, string> = {};
+    if (!purchaseDate) e.purchaseDate = 'Date is required.';
+    if (!supplierId) e.supplierId = 'Please select a supplier.';
+    if (!cropId) e.cropId = 'Please select a crop.';
+    if (!actualWeight || safeNum(actualWeight) <= 0) e.actualWeight = 'Enter a positive actual weight.';
+    if (safeNum(deductionRate) < 0) e.deductionRate = 'Deduction rate cannot be negative.';
+    if (safeNum(deductionBasisKg) <= 0) e.deductionBasisKg = 'Enter a weight greater than zero.';
+    if (safeNum(bardanaTotalKg) < 0) e.bardanaTotalKg = 'Bardana weight cannot be negative.';
+    if (safeNum(bardanaTotalKg) > safeNum(actualWeight)) e.bardanaTotalKg = 'Bardana weight cannot exceed actual weight.';
+    if (!pricePerUnit || safeNum(pricePerUnit) <= 0) e.pricePerUnit = 'Enter a price per 40 kg.';
+    if (safeNum(kundaAmount) < 0) e.kundaAmount = 'Kunda cannot be negative.';
+    if (safeNum(numBags) < 0) e.numBags = 'Bags cannot be negative.';
+    if (safeNum(pricePerBag) < 0) e.pricePerBag = 'Price per bag cannot be negative.';
+
+    // touch: amount OR weight (never both), never negative, never more than what is left
+    if (safeNum(touchAmount) < 0) e.touchAmount = 'Touch amount cannot be negative.';
+    if (safeNum(touchWeightKg) < 0) e.touchWeightKg = 'Touch weight cannot be negative.';
+    if (safeNum(touchAmount) > 0 && safeNum(touchWeightKg) > 0) {
+      e.touch = 'Enter touch either in amount or in weight, not both.';
+    }
+    if (
+      safeNum(touchWeightKg) > 0 &&
+      safeNum(actualWeight) > 0 &&
+      safeNum(bardanaTotalKg) + safeNum(touchWeightKg) + deductionWeightKgCalc > safeNum(actualWeight)
+    ) {
+      e.touchWeightKg = 'Bardana + touch weight cannot exceed actual weight.';
+    }
+    if (
+      safeNum(touchAmount) > 0 &&
+      safeNum(pricePerUnit) > 0 &&
+      safeNum(touchAmount) > cropAmountBeforeTouch
+    ) {
+      e.touchAmount = 'Touch amount cannot exceed the crop amount after bardana.';
+    }
+
     if (paymentMode === 'partial') {
-      if (!partialAmount || Number(partialAmount) < 0 || !Number.isFinite(Number(partialAmount))) {
-        setErrorMsg('Enter the amount paid (0 or more).');
-        return;
-      }
-      if (amountPaid > grandTotal) {
-        setErrorMsg('Amount paid cannot be more than the purchase total.');
-        return;
+      const partVal = safeNum(partialAmount, -1);
+      if (partVal < 0 || partVal > grandTotal) {
+        e.partialAmount = `Partial amount must be between Rs. 0 and Rs. ${grandTotal.toLocaleString()}`;
       }
     }
 
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }, [purchaseDate, supplierId, cropId, actualWeight, deductionRate, deductionBasisKg, bardanaTotalKg, pricePerUnit, kundaAmount, numBags, pricePerBag, touchAmount, touchWeightKg, deductionWeightKgCalc, cropAmountBeforeTouch, paymentMode, partialAmount, grandTotal]);
+
+  // ── submit ─────────────────────────────────────────────────────────────────
+  const handleSave = async () => {
+    if (!validate()) return;
     setIsSubmitting(true);
-    setErrorMsg('');
 
-    const validExpenses = expenses
-      .filter((e) => Number(e.amount) > 0)
-      .map((e) => ({ expense_type: e.expense_type || 'General', amount: Number(e.amount), is_income: e.is_income, notes: e.notes }));
+    // Touch is recorded in the transaction notes so it can be read back later
+    const touchLine = hasTouch
+      ? `Touch: ${touchAmountNum > 0 ? fmtRs(touchAmountNum) : fmtKg(touchKgNum)}${touchNote.trim() ? ` — ${touchNote.trim()}` : ''
+      }`
+      : '';
+    const combinedNotes = [notes.trim(), touchLine].filter(Boolean).join(' | ');
 
-    const res = await saveMultiPurchaseTransaction({
-      supplier_id: supplierId,
-      items: cart.map(({ _key, commissionWeightKg, bardanaWeightKg, netWeightKg, cropAmountPkr, ...item }) => item),
-      expenses: validExpenses,
-      vehicle_number: vehicleNumber || undefined,
-      notes: invoiceNotes,
+    const res = await savePurchaseTransactionV2({
+      purchase_date: purchaseDate,
+      supplier_id: Number(supplierId),
+      crop_id: Number(cropId),
+      variety_id: varietyId ? Number(varietyId) : null,
+      actual_weight_kg: safeNum(actualWeight),
+      deduction_rate: safeNum(deductionRate),
+      deduction_basis_kg: safeNum(deductionBasisKg),
+      bardana_rate: effBardanaRate,
+      bardana_basis_kg: effBardanaBasisKg,
+      price_per_40kg: safeNum(pricePerUnit),
+      kunda_amount_pkr: effKundaAmount,
+      num_bags: Math.max(0, Math.floor(safeNum(numBags))),
+      price_per_bag_pkr: safeNum(pricePerBag),
+      payment_mode: paymentMode,
       amount_paid: amountPaid,
+      notes: combinedNotes || undefined,
     });
 
     setIsSubmitting(false);
@@ -245,586 +368,663 @@ export function PurchaseEntryForm({ crops, suppliers, onSuccess }: PurchaseEntry
     if (res.success) {
       setReceipt({
         invoiceNo: res.invoiceNo!,
-        purchaseDate: new Date().toLocaleString('en-PK', {
-          timeZone: 'Asia/Karachi', day: '2-digit', month: 'long', year: 'numeric',
-          hour: '2-digit', minute: '2-digit',
-        }),
-        supplierName: selectedSupplier?.name || 'Unknown Supplier',
-        supplierPhone: selectedSupplier?.phone || '',
-        vehicleNumber: vehicleNumber || '',
-        items: cart.map((i) => ({
-          cropName: i.crop_name || '—',
-          varietyName: i.variety_name || '',
-          bags: i.bags,
-          grossWeightKg: i.gross_weight_kg,
-          commissionPer40kg: i.commission_per_40kg,
-          commissionWeightKg: i.commissionWeightKg,
-          bardanaPerBagKg: i.bardana_per_bag_kg || 0,
-          bardanaWeightKg: i.bardanaWeightKg,
-          netWeightKg: i.netWeightKg,
-          ratePer40kg: i.rate_per_40kg,
-          cropAmountPkr: i.cropAmountPkr,
-        })),
-        expenses: validExpenses,
-        totalCropAmount: cartTotal,
-        totalExpensesNet,
-        totalExpensesDisplay,
-        amountPaid,
-        remainingDue,
+        purchaseDate,
+        supplierName: selectedSupplier?.name || '—',
+        cropName: pickedCrop?.name || '—',
+        varietyName: varieties.find((v) => v.id === Number(varietyId))?.name || '',
+        actualWeightKg: safeNum(actualWeight),
+        deductionRate: safeNum(deductionRate),
+        deductionBasisKg: safeNum(deductionBasisKg),
+        deductionWeightKg: calc.deductionWeightKg,
+        bardanaRate: effBardanaRate,
+        bardanaBasisKg: effBardanaBasisKg,
+        bardanaWeightKg: bardanaShownKg,
+        touchWeightKg: touchKgNum,
+        touchAmountPkr: touchAmountNum,
+        touchNote: hasTouch ? touchNote.trim() : '',
+        netPayableWeightKg: calc.netPayableWeightKg,
+        pricePerUnit: safeNum(pricePerUnit),
+        cropAmountBeforeTouchPkr: cropAmountBeforeTouch,
+        cropPaymentPkr: cropPaymentAfterTouch,
+        kundaAmountPkr: safeNum(kundaAmount),
+        numBags: Math.max(0, Math.floor(safeNum(numBags))),
+        pricePerBagPkr: safeNum(pricePerBag),
+        totalBagAmountPkr: calc.totalBagAmountPkr,
+        totalPurchaseAmountPkr: calc.totalPurchaseAmountPkr,
+        physicalStockToAddKg: calc.physicalStockToAddKg,
+        paymentMode,
+        amountPaid: res.amountPaid ?? amountPaid,
+        remainingDue: res.remainingDue ?? remainingDue,
       });
-      resetAll();
+
+      // reset form
+      setPurchaseDate(today());
+      setSupplierId('');
+      setCropId('');
+      setVarietyId('');
+      setActualWeight('');
+      setDeductionRate('0');
+      setDeductionBasisKg('40');
+      setBardanaTotalKg('0');
+      setPricePerUnit('');
+      setTouchAmount('');
+      setTouchWeightKg('');
+      setTouchNote('');
+      setKundaAmount('0');
+      setNumBags('0');
+      setPricePerBag('0');
+      setPaymentMode('none');
+      setPartialAmount('');
+      setNotes('');
+      setErrors({});
       if (onSuccess) onSuccess();
     } else {
-      setErrorMsg(res.message || 'Failed to save purchase.');
+      setErrors({ _form: res.message || 'Failed to save purchase.' });
     }
   };
 
-  const handleDownloadPdf = () => window.print();
-
+  // ── render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* ── Receipt Modal ───────────────────────── */}
+      {/* ── Receipt Modal ──────────────────────────────────────────────────── */}
       {receipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[96vh] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 bg-blue-700 text-white rounded-t-2xl shrink-0">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5" />
-                <div>
-                  <p className="font-bold text-sm">Purchase Saved!</p>
-                  <p className="text-xs text-blue-100 font-mono">{receipt.invoiceNo}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3">
+          <div className="flex max-h-[94vh] w-full max-w-sm flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+            {/* header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold text-slate-900">Purchase saved</p>
+                  <p className="font-mono text-[11px] text-slate-500">{receipt.invoiceNo}</p>
                 </div>
               </div>
-              <button onClick={() => setReceipt(null)} className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="w-4 h-4" /></button>
-            </div>
-
-            <div id="purchase-receipt-printable" className="relative overflow-y-auto flex-1 p-5 space-y-3 text-slate-800">
-              {/* Background Watermark */}
-              <div
-                className="pointer-events-none select-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.06] print:opacity-[0.08]"
-                aria-hidden="true"
+              <button
+                onClick={() => setReceipt(null)}
+                aria-label="Close"
+                className="text-slate-400 hover:text-slate-700"
               >
-                <img
-                  src="/images/shafiq shop logo.jpeg"
-                  alt=""
-                  className="w-56 h-56 object-contain"
-                />
-              </div>
-
-              <div className="relative z-10 text-center border-b-2 border-dashed border-slate-200 pb-3">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <img
-                    src="/images/shafiq shop logo.jpeg"
-                    alt="Logo"
-                    className="w-7 h-7 rounded-md object-contain border border-slate-200"
-                  />
-                  <span className="font-extrabold text-slate-900 text-base">{SHOP_NAME}</span>
-                </div>
-                <p className="text-[10px] text-slate-400">{SHOP_TAGLINE}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                <span className="text-slate-500">Invoice</span><span className="font-bold text-right font-mono">{receipt.invoiceNo}</span>
-                <span className="text-slate-500">Date</span><span className="font-semibold text-right text-[11px]">{receipt.purchaseDate}</span>
-              </div>
-              <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-200 text-xs">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Supplier</p>
-                <p className="font-bold text-sm">{receipt.supplierName}</p>
-                {receipt.supplierPhone && <p className="text-slate-500 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{receipt.supplierPhone}</p>}
-                {receipt.vehicleNumber && <p className="text-slate-700 font-semibold flex items-center gap-1 mt-0.5">🚛 Vehicle: <span className="font-bold tracking-wide">{receipt.vehicleNumber}</span></p>}
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items</p>
-                {receipt.items.map((item, idx) => (
-                  <div key={idx} className="border border-slate-200 rounded-lg p-2.5">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-bold text-sm">{idx + 1}. {item.cropName}{item.varietyName ? ` — ${item.varietyName}` : ''}</span>
-                      <span className="font-extrabold text-blue-800 text-sm">Rs. {item.cropAmountPkr.toLocaleString()}</span>
-                    </div>
-                    <table className="w-full text-xs text-slate-600">
-                      <tbody>
-                        {item.bags > 0 && <tr><td>Bags</td><td className="text-right font-semibold">{item.bags}</td></tr>}
-                        <tr><td>Gross Weight</td><td className="text-right font-semibold">{item.grossWeightKg.toLocaleString()} kg</td></tr>
-                        <tr><td>Commission ({item.commissionPer40kg} kg/40kg)</td><td className="text-right text-rose-600">−{item.commissionWeightKg} kg</td></tr>
-                        {item.bardanaWeightKg > 0 && <tr><td>Bardana ({item.bardanaPerBagKg} kg × {item.bags} bags)</td><td className="text-right text-amber-600">−{item.bardanaWeightKg} kg</td></tr>}
-                        <tr><td className="text-emerald-700 font-semibold">Net Weight (Payable)</td><td className="text-right text-emerald-700 font-bold">{item.netWeightKg.toLocaleString()} kg</td></tr>
-                        <tr><td>Rate / 40 kg</td><td className="text-right">Rs. {item.ratePer40kg.toLocaleString()}</td></tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-dashed border-slate-200 pt-2 space-y-1 text-xs">
-                <div className="flex justify-between font-semibold">
-                  <span>Crop Total</span><span>Rs. {receipt.totalCropAmount.toLocaleString()}</span>
-                </div>
-                {receipt.expenses.map((e, i) => (
-                  <div key={i} className={`flex justify-between ${e.is_income ? 'text-emerald-700' : 'text-rose-600'}`}>
-                    <span>{e.expense_type || 'Expense'}{e.notes ? ` (${e.notes})` : ''}</span>
-                    <span>{e.is_income ? '+' : '−'} Rs. {e.amount.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="bg-blue-700 text-white rounded-xl px-4 py-3 flex items-center justify-between">
-                <span className="font-bold text-sm">Grand Total</span>
-                <span className="text-xl font-extrabold">Rs. {(receipt.totalCropAmount + receipt.totalExpensesNet).toLocaleString()}</span>
-              </div>
-              <div className="space-y-0.5 text-xs">
-                <div className="flex justify-between"><span className="text-slate-600">Amount paid</span><span className="font-bold text-blue-700">Rs. {receipt.amountPaid.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">Remaining payable</span><span className={`font-extrabold ${receipt.remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'}`}>Rs. {receipt.remainingDue.toLocaleString()}</span></div>
-              </div>
-              <p className="text-center text-[10px] text-slate-400 border-t border-dashed border-slate-200 pt-2">Computer-generated receipt</p>
-            </div>
-
-            <div className="flex gap-2 px-5 py-3 border-t border-slate-200 bg-slate-50 rounded-b-2xl shrink-0">
-              <button onClick={handleDownloadPdf} className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm py-2.5 rounded-lg transition">
-                <Download className="w-4 h-4" /> Save PDF
+                <X className="h-4 w-4" />
               </button>
-              <button onClick={() => setReceipt(null)} className="w-10 h-10 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-400 flex items-center justify-center"><X className="w-4 h-4" /></button>
             </div>
-          </div>
-        </div>
-      )}
 
-      <style jsx global>{`
-        @media print {
-          body * { visibility: hidden; }
-          #purchase-receipt-printable, #purchase-receipt-printable * { visibility: visible; }
-          #purchase-receipt-printable { position: fixed; top: 0; left: 0; width: 80mm; padding: 10px; font-size: 11px; }
-        }
-      `}</style>
-
-      {/* ── Mobile Tab Navigation (Hidden on Desktop) ────── */}
-      <div className="lg:hidden flex border border-slate-200 rounded-lg p-0.5 bg-slate-100 gap-1 mt-2">
-        <button
-          type="button"
-          onClick={() => setMobileTab('items')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-bold transition ${mobileTab === 'items'
-            ? 'bg-blue-700 text-white'
-            : 'text-slate-600 hover:text-slate-900'
-            }`}
-        >
-          <Sprout className="w-3.5 h-3.5" />
-          <span>1. Crop &amp; Items</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab('cart')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-bold transition ${mobileTab === 'cart'
-            ? 'bg-blue-700 text-white'
-            : 'text-slate-600 hover:text-slate-900'
-            }`}
-        >
-          <ShoppingCart className="w-3.5 h-3.5" />
-          <span>2. Supplier &amp; Save</span>
-          {cart.length > 0 && (
-            <span className={`text-[10px] px-1.5 rounded-full font-bold ${mobileTab === 'cart' ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
-              }`}>
-              {cart.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {justAddedMsg && (
-        <div className="lg:hidden flex items-center justify-between p-2 mt-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md text-xs font-medium">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Item added! ({cart.length} in cart)</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMobileTab('cart')}
-            className="text-xs font-bold text-blue-700 underline ml-2"
-          >
-            Go to Supplier &amp; Save →
-          </button>
-        </div>
-      )}
-
-      {/* ── Two equal halves ───────────────────────── */}
-      <div className="mt-2 flex flex-col lg:flex-row gap-3 lg:h-[calc(100vh-120px)] lg:min-h-[560px]">
-
-        {/* ═══ LEFT HALF: Supplier + Cart + Expenses + Finalize ═══ */}
-        <div className={`${mobileTab === 'cart' ? 'flex' : 'hidden'} lg:flex lg:flex-1 lg:basis-0 min-w-0 flex-col gap-2 lg:overflow-y-auto`}>
-
-          {/* Supplier */}
-          <div className={`${CARD} shrink-0`}>
-            <div className={CARD_HEAD}>
-              <User className="w-3.5 h-3.5 text-slate-500" />
-              <span className={CARD_TITLE}>Supplier / Farmer <span className="text-rose-500">*</span></span>
-            </div>
-            {selectedSupplier ? (
-              <div className="px-3 py-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">{selectedSupplier.name.charAt(0)}</div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm text-slate-900 leading-tight truncate">{selectedSupplier.name}</p>
-                    <p className="text-[11px] text-slate-500 truncate">
-                      {selectedSupplier.phone || 'No phone'}
-                      {selectedSupplier.outstanding !== undefined && selectedSupplier.outstanding !== null && (
-                        <> · Balance {selectedSupplier.outstanding < 0 ? `due to supplier Rs. ${fmt(-selectedSupplier.outstanding)}` : selectedSupplier.outstanding > 0 ? `receivable Rs. ${fmt(selectedSupplier.outstanding)}` : 'Rs. 0'}</>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => { setSelectedSupplierId(null); setSupplierSearch(''); }} aria-label="Change supplier" className="text-slate-300 hover:text-rose-500 transition shrink-0"><X className="w-4 h-4" /></button>
+            {/* body */}
+            <div id="purchase-receipt-printable" className="flex-1 space-y-2 overflow-y-auto px-4 py-2.5 text-slate-800">
+              <div className="border-b border-dashed border-slate-200 pb-1.5 text-center">
+                <p className="text-sm font-bold text-slate-900">M-Shafiq Commission Shop</p>
+                <p className="text-[11px] text-slate-400">Crop Commission Agent — Grain & Commodity Trade</p>
               </div>
-            ) : (
-              <div className="p-2 space-y-1.5">
-                <input type="text" placeholder="Search supplier..." value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)}
-                  className={`${INPUT} placeholder-slate-400`} />
-                {supplierSearch && (
-                  <div className="border border-slate-200 rounded-md overflow-hidden max-h-32 overflow-y-auto">
-                    {filteredSuppliers.length === 0
-                      ? <p className="px-3 py-2 text-xs text-slate-400 text-center">No results</p>
-                      : filteredSuppliers.map((s) => (
-                        <button key={s.id} type="button" onClick={() => { setSelectedSupplierId(s.id); setSupplierSearch(''); }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-slate-50 border-b border-slate-100 last:border-0">
-                          <p className="text-sm font-semibold">{s.name}</p>
-                          <p className="text-[11px] text-slate-400">
-                            {s.phone ? `${s.phone} · ` : ''}
-                            {s.outstanding !== undefined && s.outstanding !== null
-                              ? s.outstanding < 0
-                                ? `Payable: Rs. ${fmt(-s.outstanding)}`
-                                : `Balance: Rs. ${fmt(s.outstanding)}`
-                              : ''}
-                          </p>
-                        </button>
-                      ))}
+
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs">
+                <span className="text-slate-500">Invoice</span><span className="text-right font-mono font-semibold">{receipt.invoiceNo}</span>
+                <span className="text-slate-500">Date</span><span className="text-right font-medium">{receipt.purchaseDate}</span>
+                <span className="text-slate-500">Supplier</span><span className="text-right font-semibold">{receipt.supplierName}</span>
+                <span className="text-slate-500">Crop</span><span className="text-right font-medium">{receipt.cropName}{receipt.varietyName ? ` — ${receipt.varietyName}` : ''}</span>
+              </div>
+
+              <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1">
+                <p className="mb-0.5 text-[11px] font-semibold text-slate-500">Weight & settlement</p>
+                <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Actual weight</span><span className={RECEIPT_VALUE}>{fmtKg(receipt.actualWeightKg)}</span></div>
+                <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Deduction ({receipt.deductionRate} kg/{receipt.deductionBasisKg}kg)</span><span className="font-medium tabular-nums text-rose-600">− {fmtKg(receipt.deductionWeightKg)}</span></div>
+                {receipt.bardanaWeightKg > 0 && (
+                  <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Bardana weight</span><span className="font-medium tabular-nums text-rose-600">− {fmtKg(receipt.bardanaWeightKg)}</span></div>
+                )}
+                {receipt.touchWeightKg > 0 && (
+                  <div className={RECEIPT_ROW}>
+                    <span className={RECEIPT_LABEL}>Touch (weight){receipt.touchNote ? ` — ${receipt.touchNote}` : ''}</span>
+                    <span className="font-medium tabular-nums text-rose-600">− {fmtKg(receipt.touchWeightKg)}</span>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-
-          {/* Cart */}
-          <div className={`${CARD} overflow-hidden flex flex-col min-h-[88px] lg:flex-1`}>
-            <div className={`${CARD_HEAD} justify-between shrink-0`}>
-              <div className="flex items-center gap-1.5">
-                <ShoppingCart className="w-3.5 h-3.5 text-slate-500" />
-                <span className={CARD_TITLE}>Purchase Items</span>
-              </div>
-              <span className="text-[11px] font-semibold text-slate-500">{cart.length} item{cart.length !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
-              {cart.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-5 px-4 text-center">
-                  <p className="text-xs text-slate-400">No items added yet</p>
-                  <button
-                    type="button"
-                    onClick={() => setMobileTab('items')}
-                    className="lg:hidden mt-2 text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-md border border-blue-200"
-                  >
-                    ← Select Crop to Add
-                  </button>
-                </div>
-              ) : (
-                cart.map((item) => (
-                  <div key={item._key} className="px-3 py-1.5 flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-[13px] text-slate-900 leading-tight truncate">
-                        {item.crop_name}{item.variety_name ? <span className="text-blue-700"> — {item.variety_name}</span> : null}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {item.bags > 0 ? `${item.bags} bags · ` : ''}{item.gross_weight_kg.toLocaleString()} kg gross · {item.netWeightKg.toLocaleString()} kg net · Rs. {item.rate_per_40kg.toLocaleString()}/40kg
-                      </p>
+                <div className={RECEIPT_ROW}><span className="font-medium text-emerald-700">Net payable weight</span><span className="font-semibold tabular-nums text-emerald-800">{fmtKg(receipt.netPayableWeightKg)}</span></div>
+                <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Rate / 40 kg</span><span className={RECEIPT_VALUE}>{fmtRs(receipt.pricePerUnit)}</span></div>
+                {receipt.touchAmountPkr > 0 && (
+                  <>
+                    <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Crop amount (before touch)</span><span className={RECEIPT_VALUE}>{fmtRs(receipt.cropAmountBeforeTouchPkr)}</span></div>
+                    <div className={RECEIPT_ROW}>
+                      <span className={RECEIPT_LABEL}>Touch (amount){receipt.touchNote ? ` — ${receipt.touchNote}` : ''}</span>
+                      <span className="font-medium tabular-nums text-rose-600">− {fmtRs(receipt.touchAmountPkr)}</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-bold text-blue-800 text-[13px]">Rs. {item.cropAmountPkr.toLocaleString()}</span>
-                      <button onClick={() => setCart((p) => p.filter((i) => i._key !== item._key))} aria-label="Remove item" className="text-slate-300 hover:text-rose-500 transition">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {cart.length > 0 && (
-              <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
-                <span className="text-xs font-bold text-slate-700">Crop Total</span>
-                <span className="font-extrabold text-slate-900 text-sm">Rs. {cartTotal.toLocaleString()}</span>
+                  </>
+                )}
+                <div className={RECEIPT_ROW}><span className="font-medium text-slate-700">Crop payment</span><span className="font-semibold tabular-nums text-slate-900">{fmtRs(receipt.cropPaymentPkr)}</span></div>
               </div>
-            )}
-          </div>
 
-          {/* Expenses */}
-          <div className={`${CARD} shrink-0`}>
-            <div className={`${CARD_HEAD} justify-between`}>
-              <span className={CARD_TITLE}>Expenses (Transport, Labour etc.)</span>
-              <button type="button" onClick={() => setExpenses((p) => [...p, { expense_type: '', amount: '', is_income: false, notes: '' }])}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                <Plus className="w-3 h-3" /> Add
-              </button>
-            </div>
-            <div className="p-2 space-y-1.5">
-              {expenses.map((exp, idx) => (
-                <div key={idx} className="flex gap-1.5 items-center">
-                  {/* Income/Expense Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, is_income: !x.is_income } : x))}
-                    title={exp.is_income ? 'Income (adds to total) — click to switch to expense' : 'Expense (subtracts from total) — click to switch to income'}
-                    className={`shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center text-sm font-bold transition ${
-                      exp.is_income
-                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                        : 'border-rose-300 bg-rose-50 text-rose-600'
-                    }`}
-                  >
-                    {exp.is_income ? '+' : '−'}
-                  </button>
-                  <input type="text" placeholder="Type (e.g. Truck Rent)" value={exp.expense_type}
-                    onChange={(e) => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, expense_type: e.target.value } : x))}
-                    className="flex-1 min-w-0 px-2 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                  <input type="number" step="1" min="0" placeholder="PKR" value={exp.amount}
-                    onChange={(e) => setExpenses((p) => p.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))}
-                    className="w-24 px-2 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                  {expenses.length > 1 && (
-                    <button type="button" onClick={() => setExpenses((p) => p.filter((_, i) => i !== idx))} aria-label="Remove expense" className="text-slate-300 hover:text-rose-500">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+              {(receipt.kundaAmountPkr > 0 || receipt.numBags > 0) && (
+                <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-1">
+                  <p className="mb-0.5 text-[11px] font-semibold text-slate-500">Other charges</p>
+                  {receipt.kundaAmountPkr > 0 && (
+                    <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Kunda</span><span className={RECEIPT_VALUE}>{fmtRs(receipt.kundaAmountPkr)}</span></div>
+                  )}
+                  {receipt.numBags > 0 && (
+                    <div className={RECEIPT_ROW}><span className={RECEIPT_LABEL}>Bags ({receipt.numBags} × {fmtRs(receipt.pricePerBagPkr)})</span><span className={RECEIPT_VALUE}>{fmtRs(receipt.totalBagAmountPkr)}</span></div>
                   )}
                 </div>
-              ))}
-              {totalExpensesDisplay > 0 && (
-                <div className="flex justify-between text-xs font-semibold text-slate-700 pt-1 border-t border-slate-100">
-                  <span>Net Adjustment</span>
-                  <span className={totalExpensesNet >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
-                    {totalExpensesNet >= 0 ? '+' : ''}Rs. {totalExpensesNet.toLocaleString()}
+              )}
+
+              <div className="space-y-0.5 border-t-2 border-slate-300 pt-1.5 text-xs">
+                <div className="flex justify-between text-sm font-bold">
+                  <span>Grand total</span>
+                  <span className="tabular-nums text-slate-900">{fmtRs(receipt.totalPurchaseAmountPkr)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Paid now ({receipt.paymentMode === 'full' ? 'Full' : receipt.paymentMode === 'partial' ? 'Partial' : 'Credit'})</span>
+                  <span className="font-semibold tabular-nums text-emerald-700">{fmtRs(receipt.amountPaid)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Remaining to khata</span>
+                  <span className={`font-semibold tabular-nums ${receipt.remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                    {fmtRs(receipt.remainingDue)}
                   </span>
                 </div>
-              )}
+                <div className="flex justify-between pt-0.5 text-slate-500">
+                  <span>Physical stock added</span>
+                  <span className="font-medium tabular-nums">{fmtKg(receipt.physicalStockToAddKg)}</span>
+                </div>
+              </div>
+
+              <p className="border-t border-dashed border-slate-200 pt-1.5 text-center text-[11px] text-slate-400">
+                Thank you for your business · Computer generated receipt
+              </p>
+            </div>
+
+            {/* footer actions */}
+            <div className="flex shrink-0 gap-2 border-t border-slate-200 px-4 py-2">
+              <button
+                onClick={() => window.print()}
+                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded bg-slate-800 text-xs font-medium text-white hover:bg-slate-900"
+              >
+                <Download className="h-3.5 w-3.5" /> Print receipt
+              </button>
+              <button
+                onClick={() => setReceipt(null)}
+                className="h-8 flex-1 rounded border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Notes + Finalize */}
-          <div className="shrink-0 space-y-1.5">
-            <div className="grid grid-cols-2 gap-2">
-              <input type="text" placeholder="Vehicle number (e.g. LEA-123)" value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
-                className={INPUT} />
-              <input type="text" placeholder="Invoice notes (optional)" value={invoiceNotes}
-                onChange={(e) => setInvoiceNotes(e.target.value)}
-                className={INPUT} />
-            </div>
-            {/* Payment (Full, Partial, Total Credit) */}
-            <div className={`${CARD} shrink-0`}>
-              <div className={CARD_HEAD}>
-                <Wallet className="w-3.5 h-3.5 text-slate-500" />
-                <span className={CARD_TITLE}>Payment Method <span className="text-rose-500">*</span></span>
-              </div>
-              <div className="p-2.5 space-y-2">
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'full' as PaymentMode, title: 'Full payment' },
-                    { id: 'partial' as PaymentMode, title: 'Partial payment' },
-                    { id: 'none' as PaymentMode, title: 'Credit (No payment)' },
-                  ].map((o) => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => setPaymentMode(o.id)}
-                      className={`py-1.5 rounded-md border text-xs font-bold transition ${
-                        paymentMode === o.id
-                          ? 'border-blue-600 bg-blue-50 text-blue-800'
-                          : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                      }`}
+      {/* ── Main Form ──────────────────────────────────────────────────────── */}
+      <div className="mx-auto w-full max-w-6xl">
+
+        {errors._form && (
+          <div className="mb-2 flex items-start gap-2 rounded border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {errors._form}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+
+          {/* ═══════════════ LEFT: inputs ═══════════════ */}
+          <div className="rounded border border-slate-200 bg-white">
+
+            {/* ── Purchase information ────────────────────────────────────── */}
+            <Section title="Purchase information">
+              <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5 md:grid-cols-12">
+
+                <Field label="Purchase date" htmlFor="pur-date" required error={errors.purchaseDate} className="md:col-span-3">
+                  <input
+                    id="pur-date"
+                    type="date"
+                    value={purchaseDate}
+                    onChange={(e) => setPurchaseDate(e.target.value)}
+                    className={`${INPUT} ${errors.purchaseDate ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field label="Supplier" htmlFor="pur-supplier" required error={errors.supplierId} className="col-span-2 md:col-span-5">
+                  <div className="relative">
+                    <select
+                      id="pur-supplier"
+                      value={supplierId}
+                      onChange={(e) => setSupplierId(e.target.value)}
+                      className={`${SELECT} ${errors.supplierId ? INPUT_ERR : ''}`}
                     >
-                      {o.title}
-                    </button>
-                  ))}
+                      <option value="">— Select supplier —</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                          {s.outstanding !== undefined && s.outstanding !== null
+                            ? s.outstanding < 0
+                              ? ` (Payable: Rs. ${Math.abs(s.outstanding).toLocaleString()})`
+                              : s.outstanding > 0
+                                ? ` (Balance: Rs. ${s.outstanding.toLocaleString()})`
+                                : ' (Rs. 0)'
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                  </div>
+                  {selectedSupplier && (
+                    <p className="mt-0.5 text-[11px] leading-tight text-slate-500">
+                      Khata:{' '}
+                      <span className={`font-medium ${currentOutstanding < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
+                        {currentOutstanding < 0
+                          ? `Rs. ${Math.abs(currentOutstanding).toLocaleString()} (shop owes supplier)`
+                          : currentOutstanding > 0
+                            ? `Rs. ${currentOutstanding.toLocaleString()} (supplier owes shop)`
+                            : 'Rs. 0 (settled)'}
+                      </span>
+                    </p>
+                  )}
+                </Field>
+
+                <Field label="Actual weight (kg)" htmlFor="pur-actual-weight" required error={errors.actualWeight} className="col-span-2 md:col-span-4">
+                  <input
+                    id="pur-actual-weight"
+                    type="number"
+                    step="100"
+                    min="0"
+                    placeholder="e.g. 4200"
+                    value={actualWeight}
+                    onChange={(e) => setActualWeight(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.actualWeight ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field
+                  label="Crop"
+                  htmlFor="pur-crop"
+                  required
+                  error={errors.cropId}
+                  className={varieties.length > 0 ? 'md:col-span-4' : 'md:col-span-8'}
+                >
+                  <div className="relative">
+                    <select
+                      id="pur-crop"
+                      value={cropId}
+                      onChange={(e) => handleCropChange(e.target.value)}
+                      className={`${SELECT} ${errors.cropId ? INPUT_ERR : ''}`}
+                    >
+                      <option value="">— Select crop —</option>
+                      {crops.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </Field>
+
+                {varieties.length > 0 && (
+                  <Field label="Crop variety" htmlFor="pur-variety" className="md:col-span-4">
+                    <div className="relative">
+                      <select
+                        id="pur-variety"
+                        value={varietyId}
+                        onChange={(e) => setVarietyId(e.target.value)}
+                        className={SELECT}
+                      >
+                        <option value="">— No variety —</option>
+                        {varieties.map((v) => (
+                          <option key={v.id} value={v.id}>{v.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    </div>
+                  </Field>
+                )}
+
+              </div>
+            </Section>
+
+            {/* ── Deductions, crop payment & charges ──────────────────────── */}
+            <Section
+              title="Deductions, crop payment & charges"
+              aside={
+                hasTouch ? (
+                  <button
+                    type="button"
+                    onClick={clearTouch}
+                    className="text-[11px] font-medium text-blue-700 hover:underline"
+                  >
+                    Clear touch
+                  </button>
+                ) : null
+              }
+            >
+              {/* Deduction Rate (hidden in the current design — kept as before)
+              <div>
+                <label htmlFor="pur-deduction-rate">Deduction Rate (kg)</label>
+                <input
+                  id="pur-deduction-rate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={deductionRate}
+                  onChange={(e) => setDeductionRate(e.target.value)}
+                />
+                <input
+                  id="pur-deduction-basis"
+                  type="number"
+                  step="0.001"
+                  min="0.001"
+                  aria-label="Deduction rate basis in kilograms"
+                  value={deductionBasisKg}
+                  onChange={(e) => setDeductionBasisKg(e.target.value)}
+                />
+              </div> */}
+
+              {/* row A: bardana · price · touch */}
+              <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5 md:grid-cols-6">
+                <Field label="Bardana weight (kg)" htmlFor="pur-bardana-total" error={errors.bardanaTotalKg}>
+                  <input
+                    id="pur-bardana-total"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="e.g. 25"
+                    value={bardanaTotalKg}
+                    onChange={(e) => setBardanaTotalKg(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.bardanaTotalKg ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field label="Price / 40 kg (Rs.)" htmlFor="pur-price" required error={errors.pricePerUnit}>
+                  <input
+                    id="pur-price"
+                    type="number"
+                    step="100"
+                    min="1"
+                    placeholder="e.g. 3000"
+                    value={pricePerUnit}
+                    onChange={(e) => setPricePerUnit(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.pricePerUnit ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field label="Touch amount (Rs.)" htmlFor="pur-touch-amount" error={errors.touchAmount}>
+                  <input
+                    id="pur-touch-amount"
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="0"
+                    value={touchAmount}
+                    disabled={touchKgNum > 0}
+                    onChange={(e) => handleTouchAmountChange(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.touchAmount || errors.touch ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field label="Touch weight (kg)" htmlFor="pur-touch-weight" error={errors.touchWeightKg}>
+                  <input
+                    id="pur-touch-weight"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="0"
+                    value={touchWeightKg}
+                    disabled={touchAmountNum > 0}
+                    onChange={(e) => handleTouchWeightChange(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.touchWeightKg || errors.touch ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field label="Touch note" htmlFor="pur-touch-note" className="col-span-2">
+                  <input
+                    id="pur-touch-note"
+                    type="text"
+                    placeholder={hasTouch ? 'Note about touch' : 'Enter touch first'}
+                    value={touchNote}
+                    disabled={!hasTouch}
+                    onChange={(e) => setTouchNote(e.target.value)}
+                    className={INPUT}
+                  />
+                </Field>
+              </div>
+
+              {errors.touch && <p className="mt-1 text-[11px] text-rose-600">{errors.touch}</p>}
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                Bardana is subtracted from actual weight. Touch: enter either an amount (deducted from the crop amount
+                after bardana) or a weight (deducted after bardana); the note is active only when touch is entered.
+              </p>
+
+              {/* row B: kunda · bags */}
+              <div className="mt-2 grid grid-cols-2 gap-x-2.5 gap-y-1.5 border-t border-slate-100 pt-2 md:grid-cols-6">
+                <Field label="Kunda amount (Rs.)" htmlFor="pur-kunda" error={errors.kundaAmount} hint="Flat deduction from payable">
+                  <input
+                    id="pur-kunda"
+                    type="number"
+                    step="10"
+                    min="0"
+                    value={kundaAmount}
+                    onChange={(e) => setKundaAmount(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.kundaAmount ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field label="Number of bags" htmlFor="pur-bags" error={errors.numBags}>
+                  <input
+                    id="pur-bags"
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={numBags}
+                    onChange={(e) => setNumBags(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.numBags ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <Field label="Price per bag (Rs.)" htmlFor="pur-price-per-bag" error={errors.pricePerBag}>
+                  <input
+                    id="pur-price-per-bag"
+                    type="number"
+                    step="10"
+                    min="0"
+                    value={pricePerBag}
+                    onChange={(e) => setPricePerBag(e.target.value)}
+                    className={`${INPUT} ${NUM} ${errors.pricePerBag ? INPUT_ERR : ''}`}
+                  />
+                </Field>
+
+                <div className="min-w-0">
+                  <span className={FIELD_LABEL}>Total bag amount</span>
+                  <div className="flex h-8 items-center justify-end rounded border border-slate-200 bg-slate-50 px-2 text-[13px] font-semibold tabular-nums text-slate-800">
+                    {fmtRs(calc.totalBagAmountPkr)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Live results — one compact line */}
+              <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-0.5 border-t border-slate-100 pt-1.5 text-xs">
+                <div className="flex gap-1.5">
+                  <dt className="text-slate-500">Bardana</dt>
+                  <dd className="font-medium tabular-nums text-rose-600">{fmtKg(bardanaShownKg)}</dd>
+                </div>
+                {touchKgNum > 0 && (
+                  <div className="flex gap-1.5">
+                    <dt className="text-slate-500">Touch weight</dt>
+                    <dd className="font-medium tabular-nums text-amber-700">{fmtKg(touchKgNum)}</dd>
+                  </div>
+                )}
+                {touchAmountNum > 0 && (
+                  <div className="flex gap-1.5">
+                    <dt className="text-slate-500">Touch amount</dt>
+                    <dd className="font-medium tabular-nums text-amber-700">{fmtRs(touchAmountNum)}</dd>
+                  </div>
+                )}
+                <div className="flex gap-1.5">
+                  <dt className="text-slate-500">Net payable weight</dt>
+                  <dd className="font-medium tabular-nums text-emerald-700">{fmtKg(calc.netPayableWeightKg)}</dd>
+                </div>
+                <div className="flex gap-1.5">
+                  <dt className="text-slate-500">Crop payment</dt>
+                  <dd className="font-semibold tabular-nums text-slate-900">{fmtRs(cropPaymentAfterTouch)}</dd>
+                </div>
+              </dl>
+            </Section>
+
+            {/* ── Payment method & khata ──────────────────────────────────── */}
+            <Section title="Payment & supplier khata">
+              <div className="grid grid-cols-1 gap-x-2.5 gap-y-1.5 md:grid-cols-12">
+
+                {/* Payment mode — segmented control */}
+                <div className="min-w-0 md:col-span-5">
+                  <span className={FIELD_LABEL}>Payment mode</span>
+                  <div role="radiogroup" aria-label="Payment mode" className="grid h-8 grid-cols-3 overflow-hidden rounded border border-slate-300">
+                    {[
+                      { id: 'full' as PaymentMode, title: 'Full', desc: 'Pay entire bill now' },
+                      { id: 'partial' as PaymentMode, title: 'Partial', desc: 'Pay some now, rest to khata' },
+                      { id: 'none' as PaymentMode, title: 'Credit', desc: 'No payment — 100% added to khata' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={paymentMode === m.id}
+                        title={m.desc}
+                        onClick={() => setPaymentMode(m.id)}
+                        className={`border-l border-slate-300 px-2 text-xs font-medium first:border-l-0 ${paymentMode === m.id
+                            ? 'bg-blue-700 text-white'
+                            : 'bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                      >
+                        {m.title}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {paymentMode === 'partial' && (
-                  <div>
-                    <label className={LABEL}>Amount paid now to supplier (PKR)</label>
+                  <Field label="Amount paid now (Rs.)" htmlFor="pur-partial-amount" required error={errors.partialAmount} className="md:col-span-3">
                     <input
+                      id="pur-partial-amount"
                       type="number"
-                      step="1"
+                      step="100"
                       min="0"
-                      placeholder="0"
+                      max={grandTotal}
+                      placeholder="Enter amount paid"
                       value={partialAmount}
                       onChange={(e) => setPartialAmount(e.target.value)}
-                      className={`${INPUT} ${partialInvalid ? 'border-rose-400' : ''}`}
+                      className={`${INPUT} ${NUM} ${errors.partialAmount ? INPUT_ERR : ''}`}
                     />
-                    {partialInvalid && (
-                      <p className="mt-0.5 text-xs text-rose-600">Amount must be between 0 and the purchase total.</p>
-                    )}
-                  </div>
+                  </Field>
                 )}
 
-                <div className="grid grid-cols-3 gap-1.5 text-center">
-                  <div className="rounded-md bg-slate-50 border border-slate-200 py-1.5">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wide">Total</p>
-                    <p className="text-xs font-bold text-slate-900">Rs. {fmt(grandTotal)}</p>
-                  </div>
-                  <div className="rounded-md bg-slate-50 border border-slate-200 py-1.5">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wide">Paid Now</p>
-                    <p className="text-xs font-bold text-blue-700">Rs. {fmt(amountPaid)}</p>
-                  </div>
-                  <div className="rounded-md bg-slate-50 border border-slate-200 py-1.5">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wide">Remaining Due</p>
-                    <p className={`text-xs font-extrabold ${remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                      Rs. {fmt(remainingDue)}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedSupplier && selectedSupplier.outstanding !== undefined && selectedSupplier.outstanding !== null && paymentMode && (
-                  <p className="text-[10px] text-slate-500 bg-slate-50 rounded p-1.5 border border-slate-100">
-                    Supplier's Khata after this purchase: <span className="font-bold">
-                      Rs. {fmt(selectedSupplier.outstanding - remainingDue)}
-                    </span> {selectedSupplier.outstanding - remainingDue < 0 ? '(payable by shop)' : '(receivable by shop)'}
-                  </p>
-                )}
+                <Field
+                  label="Notes / vehicle / reference (optional)"
+                  htmlFor="pur-notes"
+                  className={paymentMode === 'partial' ? 'md:col-span-4' : 'md:col-span-7'}
+                >
+                  <input
+                    id="pur-notes"
+                    type="text"
+                    placeholder="e.g. Paid via cash, Truck # 1234"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className={INPUT}
+                  />
+                </Field>
               </div>
-            </div>
-            {errorMsg && (
-              <div className="flex items-start gap-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-md font-medium">
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{errorMsg}
-              </div>
-            )}
-            <button onClick={handleFinalize} disabled={!cart.length || !selectedSupplierId || isSubmitting}
-              className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-sm py-2.5 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
-              {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Saving...</> : `Finalize Purchase (${cart.length} item${cart.length !== 1 ? 's' : ''})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileTab('items')}
-              className="lg:hidden w-full text-center text-xs font-semibold text-slate-600 hover:text-slate-900 py-0.5"
-            >
-              ← Back to Select Crops
-            </button>
-          </div>
-        </div>
 
-        {/* ═══ RIGHT HALF: Crop → Variety → Item entry ═══ */}
-        <div className={`${mobileTab === 'items' ? 'flex' : 'hidden'} lg:flex lg:flex-1 lg:basis-0 min-w-0 flex-col gap-2 lg:overflow-y-auto`}>
-
-          {/* Crop selection */}
-          <div className={`${CARD} shrink-0`}>
-            <div className={CARD_HEAD}>
-              <Sprout className="w-3.5 h-3.5 text-green-600" />
-              <span className={CARD_TITLE}>Step 1 — Crop</span>
-            </div>
-            <div className="p-2.5">
-              {crops.length === 0 ? (
-                <div className="py-4 text-center">
-                  <p className="text-sm font-semibold text-slate-600 mb-1">No crops registered yet</p>
-                  <p className="text-xs text-slate-400 mb-2">Add crop types in the Crop Catalog first.</p>
-                  <a
-                    href="/crops"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold text-white bg-green-700 hover:bg-green-800"
-                  >
-                    Go to Crop Catalog →
-                  </a>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {crops.map((crop) => {
-                    const isSelected = pickedCropId === crop.id;
-                    return (
-                      <button key={crop.id} type="button"
-                        onClick={() => { setPickedCropId(crop.id); setPickedVarietyId(null); }}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border-2 text-[13px] font-semibold transition ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white hover:border-blue-300 text-slate-700'
-                          }`}>
-                        <Sprout className={`w-3.5 h-3.5 ${isSelected ? 'text-blue-600' : 'text-green-600'}`} />
-                        {crop.name}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Supplier Khata Impact Preview */}
+              {selectedSupplier && (
+                <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-slate-100 pt-1.5 text-[11px] text-slate-500">
+                  <span className="font-medium text-slate-700">Khata — {selectedSupplier.name}:</span>
+                  <span>
+                    Current{' '}
+                    {currentOutstanding < 0
+                      ? `payable ${fmtRs(Math.abs(currentOutstanding))}`
+                      : currentOutstanding > 0
+                        ? `balance ${fmtRs(currentOutstanding)}`
+                        : 'Rs. 0'}
+                  </span>
+                  <span>→</span>
+                  <span className="font-semibold text-slate-800">
+                    After purchase{' '}
+                    {projectedBalance < 0
+                      ? `payable ${fmtRs(Math.abs(projectedBalance))}`
+                      : projectedBalance > 0
+                        ? `balance ${fmtRs(projectedBalance)}`
+                        : 'Rs. 0'}
+                  </span>
+                  {remainingDue > 0 && (
+                    <span className="rounded bg-rose-50 px-1.5 py-0.5 font-medium text-rose-700">
+                      + {fmtRs(remainingDue)} added to supplier&apos;s ledger
+                    </span>
+                  )}
+                </p>
               )}
-            </div>
+            </Section>
           </div>
 
-          {/* Variety selection */}
-          {pickedCrop && pickedVarieties.length > 0 && (
-            <div className={`${CARD} shrink-0`}>
-              <div className={CARD_HEAD}>
-                <span className={CARD_TITLE}>
-                  Step 2 — Variety <span className="text-slate-400 font-normal normal-case">(of {pickedCrop.name})</span>
-                </span>
-              </div>
-              <div className="p-2.5 flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => setPickedVarietyId(null)}
-                  className={`px-2.5 py-1 rounded-md border-2 text-[13px] font-semibold transition ${!pickedVarietyId ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                  No Variety
-                </button>
-                {pickedVarieties.map((v) => (
-                  <button key={v.id} type="button" onClick={() => setPickedVarietyId(v.id)}
-                    className={`px-2.5 py-1 rounded-md border-2 text-[13px] font-semibold transition ${pickedVarietyId === v.id ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-700 hover:border-blue-300'}`}>
-                    {v.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* ═══════════════ RIGHT: summary + save ═══════════════ */}
+          <aside className="rounded border border-slate-200 bg-white lg:sticky lg:top-2">
+            <h2 className="border-b border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700">
+              Purchase summary
+            </h2>
 
-          {/* Item entry */}
-          {pickedCrop && (
-            <div className={`${CARD} shrink-0`}>
-              <div className={`${CARD_HEAD} justify-between`}>
-                <span className={CARD_TITLE}>
-                  {pickedVarieties.length > 0 ? 'Step 3' : 'Step 2'} — Weights &amp; Rate
-                </span>
-                <span className="text-[11px] font-semibold text-blue-700">
-                  {pickedCrop.name}{pickedVariety ? ` — ${pickedVariety.name}` : ''}
-                </span>
-              </div>
-              <div className="p-2.5">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
-                  <div>
-                    <label className={LABEL}>Bags</label>
-                    <input type="number" step="1" min="0" placeholder="0" value={itemBags}
-                      onChange={(e) => setItemBags(e.target.value)} className={INPUT} />
-                  </div>
-                  <div>
-                    <label className={LABEL}>Gross Weight (kg) <span className="text-rose-500">*</span></label>
-                    <input type="number" step="1" min="1" placeholder="e.g. 4200" value={itemGrossWeight}
-                      onChange={(e) => setItemGrossWeight(e.target.value)} className={INPUT} />
-                  </div>
-                  <div>
-                    <label className={LABEL}>Comm. / 40 kg</label>
-                    <input type="number" step="0.5" min="0" value={itemCommission}
-                      onChange={(e) => setItemCommission(e.target.value)} className={INPUT} />
-                  </div>
-                  <div>
-                    <label className={LABEL}>Rate / 40 kg <span className="text-rose-500">*</span></label>
-                    <input type="number" step="1" min="1" placeholder="e.g. 3000" value={itemRate}
-                      onChange={(e) => setItemRate(e.target.value)} className={INPUT} />
-                  </div>
-                  <div>
-                    <label className={LABEL}>Bardana / bag (kg)</label>
-                    <input type="number" step="0.1" min="0" placeholder="e.g. 0.5" value={itemBardana}
-                      onChange={(e) => setItemBardana(e.target.value)} className={INPUT} />
-                  </div>
-                </div>
+            <dl className="px-3 py-1.5">
+              <SummaryRow label="Actual weight" value={fmtKg(actualWeightNum)} />
+              {calc.deductionWeightKg > 0 && (
+                <SummaryRow label="Deduction" value={`− ${fmtKg(calc.deductionWeightKg)}`} tone="text-rose-600" />
+              )}
+              {bardanaShownKg > 0 && (
+                <SummaryRow label="Bardana" value={`− ${fmtKg(bardanaShownKg)}`} tone="text-rose-600" />
+              )}
+              {touchKgNum > 0 && (
+                <SummaryRow label="Touch (weight)" value={`− ${fmtKg(touchKgNum)}`} tone="text-rose-600" />
+              )}
+              <SummaryRow label="Net payable weight" value={fmtKg(calc.netPayableWeightKg)} tone="text-emerald-700" />
 
-                {Number(itemGrossWeight) > 0 && Number(itemRate) > 0 && (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mb-2 bg-slate-50 rounded-md px-2.5 py-1.5 border border-slate-200">
-                    <span className="text-slate-500">Comm: <strong className="text-rose-600">−{liveCalc.commissionWeightKg} kg</strong></span>
-                    {liveCalc.bardanaWeightKg > 0 && <span className="text-slate-500">Bardana: <strong className="text-amber-600">−{liveCalc.bardanaWeightKg} kg</strong></span>}
-                    <span className="text-slate-500">Net: <strong className="text-emerald-700">+{liveCalc.netWeightKg} kg</strong></span>
-                    <span className="text-slate-500">Amount: <strong className="text-blue-800">Rs. {liveCalc.cropAmountPkr.toLocaleString()}</strong></span>
-                  </div>
+              <div className="my-1 border-t border-slate-100" />
+
+              <SummaryRow label="Crop payment" value={fmtRs(cropPaymentAfterTouch)} />
+              {touchAmountNum > 0 && (
+                <SummaryRow label="Touch (amount) deducted" value={`− ${fmtRs(touchAmountNum)}`} tone="text-rose-600" />
+              )}
+              <SummaryRow label="Kunda" value={fmtRs(safeNum(kundaAmount))} />
+              <SummaryRow label="Bag amount" value={fmtRs(calc.totalBagAmountPkr)} />
+
+              <div className="mt-1 flex items-baseline justify-between border-t-2 border-slate-300 pt-1">
+                <dt className="text-xs font-semibold text-slate-700">Total purchase amount</dt>
+                <dd className="text-base font-bold tabular-nums text-slate-900">{fmtRs(calc.totalPurchaseAmountPkr)}</dd>
+              </div>
+
+              <div className="my-1 border-t border-slate-100" />
+
+              <SummaryRow
+                label={`Paid now (${paymentMode === 'full' ? 'full' : paymentMode === 'partial' ? 'partial' : 'credit'})`}
+                value={fmtRs(amountPaid)}
+                tone="text-emerald-700"
+              />
+              <SummaryRow
+                label="Remaining to khata"
+                value={fmtRs(remainingDue)}
+                tone={remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'}
+              />
+
+              <div className="my-1 border-t border-slate-100" />
+
+              <SummaryRow label="Physical stock to add" value={fmtKg(calc.physicalStockToAddKg)} />
+              <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
+                Net payable weight ({fmtKg(calc.netPayableWeightKg)}) is for supplier settlement only — stock receives the
+                full actual weight.
+              </p>
+            </dl>
+
+            <div className="border-t border-slate-200 p-2.5">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSubmitting}
+                className="flex h-9 w-full items-center justify-center gap-2 rounded bg-blue-700 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  'Save purchase'
                 )}
-
-                <button type="button" onClick={handleAddToCart} disabled={!isItemReady}
-                  className="w-full flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm py-2 rounded-md transition disabled:opacity-40 disabled:cursor-not-allowed">
-                  <Plus className="w-4 h-4" /> Add to Purchase
-                </button>
-              </div>
+              </button>
             </div>
-          )}
+          </aside>
 
-          {!pickedCrop && (
-            <div className="flex-1 flex items-center justify-center bg-white border border-dashed border-slate-300 rounded-lg min-h-[140px]">
-              <div className="text-center">
-                <Sprout className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
-                <p className="text-sm font-semibold text-slate-400">Select a crop above to begin</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>

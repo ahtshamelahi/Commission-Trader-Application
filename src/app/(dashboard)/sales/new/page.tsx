@@ -1,106 +1,102 @@
 'use client';
 
-// app/(dashboard)/sales/new/page.tsx   (adjust the path if your route differs)
-import React, { useEffect, useState } from 'react';
+// app/(dashboard)/sales/new/page.tsx
+// Mounts the new connected SaleEntryForm (Spec-B + payment methods + Khata integration)
+
+import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import { TopHeader } from '@/components/layout/top-header';
-import { PosSaleForm, type BuyerOption } from '@/components/sales/pos-sale-form';
+import { SaleEntryForm, BuyerOption } from '@/components/sales/sale-entry-form';
 import { supabase } from '@/lib/supabase/supabase-browser-client';
 import { Crop, CropVariety } from '@/types/crop-data-types';
+import { StockMovement } from '@/types/stock-data-types';
+import { Purchase } from '@/types/purchase-data-types';
+import { Sale } from '@/types/sale-data-types';
 
 export default function NewSalePage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-slate-500">Loading sale form…</div>}>
+      <NewSalePageInner />
+    </Suspense>
+  );
+}
+
+function NewSalePageInner() {
   const [crops, setCrops] = useState<Crop[]>([]);
   const [buyers, setBuyers] = useState<BuyerOption[]>([]);
-  const [purchases, setPurchases] = useState<any[]>([]);
-  const [sales, setSales] = useState<any[]>([]);
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // each section loads on its own, so the page and form open immediately
-  const [cropsLoading, setCropsLoading] = useState(true);
-  const [buyersLoading, setBuyersLoading] = useState(true);
-  const [stockLoading, setStockLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
+  const loadData = useCallback(async () => {
+    const [cropsRes, varietiesRes, buyersRes, movementsRes, purchasesRes, salesRes, balancesRes] = await Promise.all([
+      supabase.from('crops').select('*').order('name', { ascending: true }),
+      supabase.from('crop_varieties').select('*').order('name', { ascending: true }),
+      supabase
+        .from('parties')
+        .select('*')
+        .or('party_type.eq.buyer,party_type.eq.both')
+        .order('name', { ascending: true }),
+      supabase.from('stock_movements').select('*'),
+      supabase.from('purchases').select('crop_id, variety_id, gross_weight_kg, crop_amount'),
+      supabase.from('sales').select('crop_id, variety_id, physical_weight_kg'),
+      supabase.from('party_balances').select('party_id, balance'),
+    ]);
+
+    const balanceMap = new Map<number, number>();
+    if (!balancesRes.error && Array.isArray(balancesRes.data)) {
+      balancesRes.data.forEach((r: any) => balanceMap.set(Number(r.party_id), Number(r.balance)));
+    }
+
+    const varieties: CropVariety[] = (varietiesRes.data as any) || [];
+    const structuredCrops: Crop[] = ((cropsRes.data as any[]) || []).map((c) => ({
+      ...c,
+      varieties: varieties.filter((v) => v.crop_id === c.id),
+    }));
+
+    const structuredBuyers: BuyerOption[] = ((buyersRes.data as any[]) || []).map((b) => ({
+      ...b,
+      outstanding: balanceMap.has(b.id)
+        ? balanceMap.get(b.id)!
+        : b.balance !== undefined
+          ? Number(b.balance)
+          : null,
+    }));
+
+    setCrops(structuredCrops);
+    setBuyers(structuredBuyers);
+    setStockMovements(movementsRes.data || []);
+    setPurchases((purchasesRes.data as any) || []);
+    setSales((salesRes.data as any) || []);
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const addError = (msg: string) =>
-      setLoadError((prev) => (prev ? `${prev} ${msg}` : msg));
-
-    // crops + varieties
-    (async () => {
-      const [cropsRes, varietiesRes] = await Promise.all([
-        supabase.from('crops').select('*').order('name', { ascending: true }),
-        supabase.from('crop_varieties').select('*').order('name', { ascending: true }),
-      ]);
-      if (cancelled) return;
-      if (cropsRes.error || varietiesRes.error) addError('Could not load crops.');
-      const varieties: CropVariety[] = (varietiesRes.data as any) || [];
-      setCrops(
-        ((cropsRes.data as any[]) || []).map((c) => ({
-          ...c,
-          varieties: varieties.filter((v) => v.crop_id === c.id),
-        }))
-      );
-      setCropsLoading(false);
-    })();
-
-    // buyers (+ outstanding balance when the buyer_balances view exists)
-    (async () => {
-      const [buyersRes, balancesRes] = await Promise.all([
-        supabase
-          .from('parties')
-          .select('*')
-          .or('party_type.eq.buyer,party_type.eq.both')
-          .order('name', { ascending: true }),
-        supabase.from('buyer_balances').select('buyer_id, outstanding'),
-      ]);
-      if (cancelled) return;
-      if (buyersRes.error) addError('Could not load buyers.');
-      const balanceMap = new Map<number, number>();
-      if (!balancesRes.error) {
-        (balancesRes.data || []).forEach((r: any) => balanceMap.set(Number(r.buyer_id), Number(r.outstanding)));
-      }
-      setBuyers(
-        ((buyersRes.data as any[]) || []).map((b) => ({
-          ...b,
-          outstanding: balancesRes.error ? null : balanceMap.get(b.id) ?? 0,
-        }))
-      );
-      setBuyersLoading(false);
-    })();
-
-    // stock data (same queries as before)
-    (async () => {
-      const [purchasesRes, salesRes] = await Promise.all([
-        supabase.from('purchases').select('crop_id, variety_id, gross_weight_kg'),
-        supabase.from('sales').select('crop_id, variety_id, physical_weight_kg'),
-      ]);
-      if (cancelled) return;
-      if (purchasesRes.error || salesRes.error) addError('Could not load stock figures.');
-      setPurchases(purchasesRes.data || []);
-      setSales(salesRes.data || []);
-      setStockLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    loadData();
+  }, [loadData]);
 
   return (
     <>
       <TopHeader
-        title="New Sale"
-        subtitle="Select buyer & crop → add items → choose payment → save sale"
+        title="New Crop Sale"
+        subtitle="Connected calculation form — actual weight, bardana deduction, bags, buyer commission %, and Khata payment"
       />
-      <PosSaleForm
-        crops={crops}
-        buyers={buyers}
-        purchases={purchases}
-        sales={sales}
-        cropsLoading={cropsLoading}
-        buyersLoading={buyersLoading}
-        stockLoading={stockLoading}
-        loadError={loadError}
-      />
+      <div className="mt-4">
+        {isLoading ? (
+          <div className="p-6 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 text-center">
+            Loading sale form…
+          </div>
+        ) : (
+          <SaleEntryForm
+            crops={crops}
+            buyers={buyers}
+            stockMovements={stockMovements}
+            purchases={purchases}
+            sales={sales}
+            onSuccess={loadData}
+          />
+        )}
+      </div>
     </>
   );
 }

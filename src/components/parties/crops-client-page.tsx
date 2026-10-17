@@ -1,17 +1,23 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { saveCrop } from '@/lib/actions/crop-actions';
+import { saveCrop, deleteCrop } from '@/lib/actions/crop-actions';
 import { saveCropVariety, deleteCropVariety } from '@/lib/actions/crop-variety-actions';
 import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Plus, Sprout, Trash2, Layers, X } from 'lucide-react';
 
 interface CropsClientPageProps {
   initialCrops: Crop[];
+  cropStock?: Record<number, number>;
+  varietyStock?: Record<number, number>;
   isLoading?: boolean;
 }
 
-export function CropsClientPage({ initialCrops, isLoading = false }: CropsClientPageProps) {
+function hasStock(n: number | undefined) {
+  return Math.abs(n ?? 0) >= 0.005;
+}
+
+export function CropsClientPage({ initialCrops, cropStock = {}, varietyStock = {}, isLoading = false }: CropsClientPageProps) {
   const [crops, setCrops] = useState<Crop[]>(initialCrops);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cropName, setCropName] = useState('');
@@ -95,12 +101,42 @@ export function CropsClientPage({ initialCrops, isLoading = false }: CropsClient
   };
 
   const handleDeleteVariety = async (cropId: number, varietyId: number) => {
-    await deleteCropVariety(varietyId);
+    if (hasStock(varietyStock[varietyId])) {
+      setSuccessMsg(null);
+      setModalError(null);
+      alert('Cannot delete this variety while stock remains. Stock must be 0.');
+      return;
+    }
+    const res = await deleteCropVariety(varietyId);
+    if (!res.success) {
+      alert(res.message || 'Could not delete variety.');
+      return;
+    }
     setCrops((prev) =>
       prev.map((c) =>
         c.id === cropId ? { ...c, varieties: c.varieties?.filter((v) => v.id !== varietyId) || [] } : c
       )
     );
+  };
+
+  const handleDeleteCrop = async (crop: Crop) => {
+    if (hasStock(cropStock[crop.id])) {
+      alert('Cannot delete this crop while stock remains. Stock must be 0.');
+      return;
+    }
+    const blockedVariety = (crop.varieties || []).find((v) => hasStock(varietyStock[v.id]));
+    if (blockedVariety) {
+      alert(`Cannot delete "${crop.name}" because variety "${blockedVariety.name}" still has stock.`);
+      return;
+    }
+    if (!confirm(`Delete crop "${crop.name}"? This is only allowed when stock is 0.`)) return;
+    const res = await deleteCrop(crop.id);
+    if (!res.success) {
+      alert(res.message || 'Could not delete crop.');
+      return;
+    }
+    setCrops((prev) => prev.filter((c) => c.id !== crop.id));
+    setSuccessMsg(`Crop "${crop.name}" deleted.`);
   };
 
   return (
@@ -169,6 +205,7 @@ export function CropsClientPage({ initialCrops, isLoading = false }: CropsClient
             <thead className="bg-slate-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase">Crop</th>
+                <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase">Stock</th>
                 <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase">Added</th>
               </tr>
             </thead>
@@ -179,20 +216,38 @@ export function CropsClientPage({ initialCrops, isLoading = false }: CropsClient
                     <td className="px-4 py-3 font-semibold">
                       <div className="flex items-center gap-2">
                         <Sprout className="w-4 h-4 text-green-700" /> {c.name}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCrop(c)}
+                          disabled={hasStock(cropStock[c.id])}
+                          title={hasStock(cropStock[c.id]) ? 'Cannot delete while stock remains' : 'Delete crop'}
+                          className="text-slate-300 hover:text-rose-500 disabled:opacity-30 disabled:hover:text-slate-300"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs font-semibold text-slate-600">
+                      {(cropStock[c.id] ?? 0).toLocaleString()} kg
                     </td>
                     <td className="px-4 py-3 text-right text-xs text-slate-500">
                       {new Date(c.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' })}
                     </td>
                   </tr>
                   <tr className="bg-slate-50/50">
-                    <td colSpan={2} className="px-4 py-3 border-b-4 border-slate-200">
+                    <td colSpan={3} className="px-4 py-3 border-b-4 border-slate-200">
                       <div className="pl-6">
                         <div className="flex flex-wrap gap-2 mb-2">
                           {(c.varieties || []).map((v) => (
                             <span key={v.id} className="inline-flex items-center gap-1 bg-white border rounded-md px-2 py-1 text-xs">
                               {v.name}
-                              <button type="button" onClick={() => handleDeleteVariety(c.id, v.id)} className="text-slate-300 hover:text-rose-500">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteVariety(c.id, v.id)}
+                                disabled={hasStock(varietyStock[v.id])}
+                                title={hasStock(varietyStock[v.id]) ? 'Cannot delete while stock remains' : 'Delete variety'}
+                                className="text-slate-300 hover:text-rose-500 disabled:opacity-30 disabled:hover:text-slate-300"
+                              >
                                 <Trash2 className="w-3 h-3" />
                               </button>
                             </span>

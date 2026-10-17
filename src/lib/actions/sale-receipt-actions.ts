@@ -141,3 +141,86 @@ export async function getSaleReceipt(
 
   return { success: true, receipt };
 }
+
+/** Receipt from a sales row (All Sales). Does not require sale_invoices. */
+export async function getSaleReceiptBySaleId(
+  saleId: number
+): Promise<{ success: boolean; message?: string; receipt?: SaleReceipt }> {
+  if (!Number.isInteger(saleId) || saleId <= 0) {
+    return { success: false, message: 'Invalid sale.' };
+  }
+
+  const supabase = await getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('sales')
+    .select(
+      `id, invoice_no, buyer_id, bags, physical_weight_kg, commission_per_40kg, commission_weight_kg,
+       bardana_per_bag_kg, bardana_total_kg, billable_weight_kg, rate_per_40kg, sale_amount,
+       vehicle_number, notes, created_at, document_total, amount_received,
+       parties(name, phone, address), crops(name), crop_varieties(name)`
+    )
+    .eq('id', saleId)
+    .maybeSingle();
+
+  if (error || !data) return { success: false, message: error?.message || 'Sale not found.' };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const s = data as any;
+  const num = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const { data: ex } = await supabase
+    .from('sale_expenses')
+    .select('amount, notes, is_income')
+    .eq('sale_id', saleId)
+    .order('id', { ascending: true });
+
+  const expenses = (ex || []).map((e) => ({
+    label: (e.notes as string) || (e.is_income ? 'Added charge' : 'Expense'),
+    amount: num(e.amount),
+    isIncome: !!e.is_income,
+  }));
+  const itemsTotal = num(s.sale_amount);
+  const adj = expenses.reduce((sum, e) => sum + (e.isIncome ? e.amount : -e.amount), 0);
+  const grandTotal = s.document_total != null ? num(s.document_total) : round2(itemsTotal + adj);
+  const amountReceived = num(s.amount_received);
+
+  const receipt: SaleReceipt = {
+    invoiceId: num(s.id),
+    invoiceNo: s.invoice_no || `SALE-${s.id}`,
+    createdAt: s.created_at,
+    buyerId: num(s.buyer_id),
+    buyerName: s.parties?.name ?? '—',
+    buyerPhone: s.parties?.phone ?? '',
+    buyerAddress: s.parties?.address ?? '',
+    vehicleNumber: s.vehicle_number ?? '',
+    notes: s.notes ?? '',
+    items: [
+      {
+        cropName: s.crops?.name ?? '—',
+        varietyName: s.crop_varieties?.name ?? '',
+        bags: num(s.bags),
+        physicalWeightKg: num(s.physical_weight_kg),
+        commissionPer40kg: num(s.commission_per_40kg),
+        commissionWeightKg: num(s.commission_weight_kg),
+        bardanaPerBagKg: num(s.bardana_per_bag_kg),
+        bardanaWeightKg: num(s.bardana_total_kg),
+        billableWeightKg: num(s.billable_weight_kg),
+        ratePer40kg: num(s.rate_per_40kg),
+        saleAmountPkr: itemsTotal,
+      },
+    ],
+    expenses,
+    itemsTotal,
+    adjustmentAmount: Math.abs(adj),
+    adjustmentIsIncome: adj >= 0,
+    adjustmentNotes: '',
+    grandTotal,
+    amountReceived,
+    remaining: round2(grandTotal - amountReceived),
+  };
+
+  return { success: true, receipt };
+}

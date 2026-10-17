@@ -1,10 +1,18 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sale } from '@/types/sale-data-types';
 import { Crop } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
-import { Search, Filter, X, TrendingUp, Package, ReceiptText } from 'lucide-react';
+import { Search, Filter, X, TrendingUp, Package, ReceiptText, Pencil, Printer, Loader2, Phone } from 'lucide-react';
+import { getSaleReceiptBySaleId } from '@/lib/actions/sale-receipt-actions';
+import type { SaleReceipt } from '@/lib/actions/sale-receipt-actions';
+
+function isUpdated(s: Sale) {
+  if (!s.updated_at) return false;
+  return new Date(s.updated_at).getTime() - new Date(s.created_at).getTime() > 1000;
+}
 
 interface AllSalesViewProps {
   sales: Sale[];
@@ -14,6 +22,10 @@ interface AllSalesViewProps {
 }
 
 export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSalesViewProps) {
+  const router = useRouter();
+  const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState('');
   const [cropFilter, setCropFilter] = useState<string>('all');
   const [buyerFilter, setBuyerFilter] = useState<string>('all');
   const [fromDate, setFromDate] = useState<string>('');
@@ -56,6 +68,18 @@ export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSal
     setToDate('');
     setSearch('');
   };
+
+  const openReceipt = async (saleId: number) => {
+    setReceipt(null);
+    setReceiptError('');
+    setReceiptLoading(true);
+    const rec = await getSaleReceiptBySaleId(saleId);
+    setReceiptLoading(false);
+    if (rec.success && rec.receipt) setReceipt(rec.receipt);
+    else setReceiptError(rec.message || 'Could not load receipt.');
+  };
+
+  const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
 
   return (
     <div className="mt-4 space-y-4">
@@ -185,6 +209,8 @@ export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSal
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Billable (kg)</th>
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Rate/40kg</th>
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Sale Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -199,6 +225,8 @@ export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSal
                     <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-14 ml-auto" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-16 ml-auto" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-20 ml-auto" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-16" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-slate-200 rounded w-24 ml-auto" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -228,6 +256,8 @@ export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSal
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Billable (kg)</th>
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Rate/40kg</th>
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Sale Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -256,6 +286,29 @@ export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSal
                         Rs. {Number(s.sale_amount).toLocaleString(undefined, { minimumFractionDigits: 0 })}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      {isUpdated(s) ? (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-200">Updated</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => openReceipt(s.id)}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900 px-2 py-1 rounded-md hover:bg-emerald-50"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Receipt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/sales/new?edit=${s.id}`)}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 px-2 py-1 rounded-md hover:bg-slate-100"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -272,12 +325,78 @@ export function AllSalesView({ sales, crops, buyers, isLoading = false }: AllSal
                   <td className="px-4 py-3 text-right font-extrabold text-emerald-900">
                     Rs. {totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                   </td>
+                  <td colSpan={2} />
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
       </div>
+
+      {(receipt || receiptLoading || receiptError) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onMouseDown={() => { setReceipt(null); setReceiptError(''); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[96vh] overflow-hidden" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 bg-emerald-700 text-white shrink-0">
+              <div>
+                <p className="font-bold text-sm">Sale Receipt</p>
+                <p className="text-xs text-emerald-100 font-mono">{receipt?.invoiceNo || ''}</p>
+              </div>
+              <button type="button" onClick={() => { setReceipt(null); setReceiptError(''); }} className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div id="sale-receipt-printable" className="overflow-y-auto flex-1 p-4 space-y-2.5 text-slate-800 text-sm">
+              {receiptLoading && (
+                <div className="flex items-center justify-center gap-2 py-10 text-slate-500">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading receipt…
+                </div>
+              )}
+              {receiptError && <p className="text-xs text-rose-600">{receiptError}</p>}
+              {receipt && (
+                <>
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    <span className="text-slate-500">Receipt No.</span>
+                    <span className="font-bold text-right font-mono">{receipt.invoiceNo}</span>
+                    <span className="text-slate-500">Date</span>
+                    <span className="text-right">{new Date(receipt.createdAt).toLocaleString('en-PK', { timeZone: 'Asia/Karachi' })}</span>
+                  </div>
+                  <div className="border-t border-dashed border-slate-200 pt-2">
+                    <p className="font-bold">{receipt.buyerName}</p>
+                    {receipt.buyerPhone && <p className="text-slate-500 flex items-center gap-1 mt-0.5 text-xs"><Phone className="w-3 h-3" />{receipt.buyerPhone}</p>}
+                    {receipt.vehicleNumber && <p className="text-xs font-semibold mt-0.5">Vehicle: {receipt.vehicleNumber}</p>}
+                  </div>
+                  {receipt.items.map((item, idx) => (
+                    <div key={idx} className="text-xs border-t border-slate-100 pt-2 space-y-0.5">
+                      <p className="font-bold">{item.cropName}{item.varietyName ? ` — ${item.varietyName}` : ''}</p>
+                      <div className="flex justify-between"><span>Weight</span><span>{fmt(item.physicalWeightKg)} kg</span></div>
+                      <div className="flex justify-between"><span>Billable</span><span>{fmt(item.billableWeightKg)} kg</span></div>
+                      <div className="flex justify-between"><span>Rate / 40kg</span><span>Rs. {fmt(item.ratePer40kg)}</span></div>
+                      <div className="flex justify-between font-bold"><span>Amount</span><span>Rs. {fmt(item.saleAmountPkr)}</span></div>
+                    </div>
+                  ))}
+                  {receipt.expenses.map((e, i) => (
+                    <div key={i} className={`flex justify-between text-xs ${e.isIncome ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      <span>{e.label}</span>
+                      <span>{e.isIncome ? '+' : '−'}Rs. {fmt(e.amount)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between font-extrabold border-t border-slate-200 pt-2">
+                    <span>Total</span><span>Rs. {fmt(receipt.grandTotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs"><span>Received</span><span className="font-bold text-emerald-700">Rs. {fmt(receipt.amountReceived)}</span></div>
+                  <div className="flex justify-between text-xs"><span>Remaining</span><span className={`font-extrabold ${receipt.remaining > 0 ? 'text-rose-600' : ''}`}>Rs. {fmt(receipt.remaining)}</span></div>
+                </>
+              )}
+            </div>
+            <div className="p-3 border-t border-slate-200 flex gap-2">
+              <button type="button" disabled={!receipt} onClick={() => window.print()} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-700 text-white text-sm font-bold py-2 rounded-lg disabled:opacity-40">
+                <Printer className="w-3.5 h-3.5" /> Print
+              </button>
+              <button type="button" onClick={() => { setReceipt(null); setReceiptError(''); }} className="px-4 text-sm font-semibold text-slate-600">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

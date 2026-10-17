@@ -23,7 +23,7 @@ export function CurrentStockTable({ summaries, isLoading }: CurrentStockTablePro
       cell: (row) => <span className="font-bold text-slate-900 text-sm">{row.name}</span>,
     },
     {
-      header: 'Total Purchased Net (kg)',
+      header: 'Total Purchased Physical (kg)',
       align: 'right',
       cell: (row) => `${row.totalPurchasedWeightKg.toLocaleString()} kg`,
     },

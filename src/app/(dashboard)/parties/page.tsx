@@ -5,6 +5,7 @@ import { TopHeader } from '@/components/layout/top-header';
 import { PartiesClientPage } from '@/components/parties/parties-client-page';
 import { supabase } from '@/lib/supabase/supabase-browser-client';
 import { Party } from '@/types/party-data-types';
+import { calculateStoredPurchaseTotalPkr } from '@/lib/calculations/purchase-amount-calculation';
 
 export type PartyTradeTotals = Record<number, { salesTotal: number; purchaseTotal: number }>;
 
@@ -18,7 +19,9 @@ export default function PartiesPage() {
       const [partiesRes, salesRes, purchasesRes] = await Promise.all([
         supabase.from('parties').select('*').order('name', { ascending: true }),
         supabase.from('sales').select('buyer_id, sale_amount'),
-        supabase.from('purchases').select('supplier_id, crop_amount'),
+        supabase
+          .from('purchases')
+          .select('supplier_id, crop_amount, purchase_expenses(amount, is_income)'),
       ]);
       setParties(partiesRes.data || []);
       const totals: PartyTradeTotals = {};
@@ -30,7 +33,10 @@ export default function PartiesPage() {
       for (const p of purchasesRes.data || []) {
         if (!p.supplier_id) continue;
         if (!totals[p.supplier_id]) totals[p.supplier_id] = { salesTotal: 0, purchaseTotal: 0 };
-        totals[p.supplier_id].purchaseTotal += Number(p.crop_amount) || 0;
+        totals[p.supplier_id].purchaseTotal += calculateStoredPurchaseTotalPkr(
+          p.crop_amount,
+          p.purchase_expenses
+        );
       }
       setTradeTotals(totals);
       setIsLoading(false);

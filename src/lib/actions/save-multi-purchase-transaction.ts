@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import {
-  performPurchaseCalculations,
+  performPurchaseCalculations_legacy as performPurchaseCalculations,
 } from '@/lib/calculations/purchase-amount-calculation';
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;

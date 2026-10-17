@@ -10,6 +10,7 @@ import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Purchase } from '@/types/purchase-data-types';
 import { Sale } from '@/types/sale-data-types';
 import { StockMovement } from '@/types/stock-data-types';
+import { reconcileMissingStockMovements } from '@/lib/actions/reconcile-stock-movements';
 
 export default function StockPage() {
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -21,6 +22,9 @@ export default function StockPage() {
 
   useEffect(() => {
     async function loadStockData() {
+      // Backfill any purchases/sales saved without a stock_movements row.
+      await reconcileMissingStockMovements();
+
       const [cropsRes, varietiesRes, purchasesRes, salesRes, movementsRes] = await Promise.all([
         supabase.from('crops').select('*').order('name', { ascending: true }),
         supabase.from('crop_varieties').select('*').order('name', { ascending: true }),

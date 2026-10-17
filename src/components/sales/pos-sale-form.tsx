@@ -7,11 +7,12 @@ import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Party } from '@/types/party-data-types';
 import { Purchase } from '@/types/purchase-data-types';
 import { Sale } from '@/types/sale-data-types';
-import { performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
+import { performSaleCalculations_legacy as performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
 import { saveMultiSaleTransaction } from '@/lib/actions/save-multi-sale-transaction';
 import type { MultiSaleItem } from '@/lib/actions/save-multi-sale-transaction';
-import { getSaleReceipt } from '@/lib/actions/sale-receipt-actions';
+import { getSaleReceipt, getSaleReceiptBySaleId } from '@/lib/actions/sale-receipt-actions';
 import type { SaleReceipt } from '@/lib/actions/sale-receipt-actions';
+import { updateSaleTransaction, type SaleEditData } from '@/lib/actions/update-sale-transaction';
 import {
   CheckCircle2, AlertCircle, Loader2, User, Printer, X, Store, Sprout, Trash2,
   Plus, Phone, Receipt, ChevronDown, Wallet, BookOpen,
@@ -31,6 +32,7 @@ interface PosSaleFormProps {
   buyersLoading?: boolean;
   stockLoading?: boolean;
   loadError?: string;
+  editData?: SaleEditData | null;
 }
 
 interface CartItem extends MultiSaleItem {
@@ -70,8 +72,10 @@ const INPUT = 'w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md f
 export function PosSaleForm({
   crops, buyers, purchases, sales,
   cropsLoading = false, buyersLoading = false, stockLoading = false, loadError = '',
+  editData = null,
 }: PosSaleFormProps) {
   const router = useRouter();
+  const isEdit = !!editData;
 
   // Buyer (mandatory, existing parties only)
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
@@ -163,8 +167,55 @@ export function PosSaleForm({
     const vSales = sales.filter((s) => s.crop_id === cropId && s.variety_id === varietyId);
     const totalPurchasedKg = vPurchases.reduce((acc, p) => acc + Number(p.gross_weight_kg), 0);
     const totalSoldKg = vSales.reduce((acc, s) => acc + Number(s.physical_weight_kg), 0);
-    return totalPurchasedKg - totalSoldKg;
+    let stock = totalPurchasedKg - totalSoldKg;
+    if (editData && editData.item.crop_id === cropId && (editData.item.variety_id || null) === varietyId) {
+      stock += Number(editData.item.physical_weight_kg) || 0;
+    }
+    return stock;
   };
+
+  useEffect(() => {
+    if (!editData) return;
+    const item = editData.item;
+    const calc = performSaleCalculations(
+      item.physical_weight_kg,
+      item.commission_per_40kg,
+      item.rate_per_40kg,
+      item.bags || 0,
+      item.bardana_per_bag_kg || 0
+    );
+    setSelectedBuyerId(editData.buyerId || null);
+    setCart([{
+      _key: newId(),
+      ...item,
+      commissionWeightKg: calc.commissionWeightKg,
+      bardanaWeightKg: calc.bardanaWeightKg,
+      billableWeightKg: calc.billableWeightKg,
+      saleAmountPkr: calc.saleAmountPkr,
+    }]);
+    setExpenses(
+      editData.expenses
+        .filter((e) => e.amount > 0)
+        .map((e) => ({
+          id: newId(),
+          kind: e.is_income ? 'add' : 'deduct',
+          amount: e.amount,
+          notes: e.notes || '',
+        }))
+    );
+    setInvoiceNotes(editData.notes || '');
+    setVehicleNumber(editData.vehicleNumber || '');
+    const itemsTotal = calc.saleAmountPkr;
+    const expNet = editData.expenses.reduce((s, e) => s + (e.is_income ? e.amount : -e.amount), 0);
+    const total = round2(itemsTotal + expNet);
+    const rec = round2(editData.amountReceived);
+    if (rec <= 0) setPaymentMode('none');
+    else if (Math.abs(rec - total) < 0.02) setPaymentMode('full');
+    else {
+      setPaymentMode('partial');
+      setPartialAmount(String(rec));
+    }
+  }, [editData]);
   const kgLabel = (n: number) => (stockLoading ? '…' : n.toLocaleString());
 
   // Live calc for current item entry (existing formula, unchanged)
@@ -288,6 +339,10 @@ export function PosSaleForm({
       return;
     }
     if (!cart.length) { setErrorMsg('Add at least one item to the sale.'); return; }
+    if (isEdit && cart.length !== 1) {
+      setErrorMsg('This sale has one line. Keep a single item in the cart to update it.');
+      return;
+    }
     if (grandTotal < 0) { setErrorMsg('The expenses are larger than the sale total.'); return; }
     if (!paymentMode) { setErrorMsg('Choose a payment option: full, partial or no payment.'); return; }
     if (paymentMode === 'partial') {
@@ -305,11 +360,39 @@ export function PosSaleForm({
     setIsSubmitting(true);
 
     try {
+      const expensePayload = expenses.map((e) => ({ amount: e.amount, is_income: e.kind === 'add', notes: e.notes }));
+      const cartItems = cart.map(({ _key, commissionWeightKg, bardanaWeightKg, billableWeightKg, saleAmountPkr, ...item }) => item);
+
+      if (isEdit && editData) {
+        const res = await updateSaleTransaction({
+          saleId: editData.saleId,
+          buyer_id: selectedBuyer.id,
+          item: cartItems[0],
+          expenses: expensePayload,
+          vehicle_number: vehicleNumber || undefined,
+          notes: invoiceNotes,
+          amount_received: amountReceived,
+        });
+        if (!res.success) {
+          setErrorMsg(res.message || 'Failed to update sale.');
+          return;
+        }
+        setSaved({ invoiceId: editData.saleId, invoiceNo: res.invoiceNo || editData.invoiceNo, buyerId: selectedBuyer.id });
+        setReceipt(null);
+        setReceiptError('');
+        setReceiptLoading(true);
+        const rec = await getSaleReceiptBySaleId(editData.saleId);
+        if (rec.success && rec.receipt) setReceipt(rec.receipt);
+        else setReceiptError(rec.message || 'Sale updated, but the receipt could not be loaded.');
+        setReceiptLoading(false);
+        return;
+      }
+
       const res = await saveMultiSaleTransaction({
         request_id: getRequestId(),
         buyer_id: selectedBuyer.id,
-        items: cart.map(({ _key, commissionWeightKg, bardanaWeightKg, billableWeightKg, saleAmountPkr, ...item }) => item),
-        expenses: expenses.map((e) => ({ amount: e.amount, is_income: e.kind === 'add', notes: e.notes })),
+        items: cartItems,
+        expenses: expensePayload,
         vehicle_number: vehicleNumber || undefined,
         notes: invoiceNotes,
         amount_received: amountReceived,
@@ -320,7 +403,6 @@ export function PosSaleForm({
         return;
       }
 
-      // saved: show success + load the receipt from the saved records
       const buyerId = selectedBuyer.id;
       setSaved({ invoiceId: res.invoiceId, invoiceNo: res.invoiceNo, buyerId });
       setReceipt(null);
@@ -345,6 +427,7 @@ export function PosSaleForm({
     setSaved(null);
     setReceipt(null);
     setReceiptError('');
+    if (isEdit) router.push('/sales/all');
   };
 
   const payOptions: { id: PaymentMode; title: string }[] = [
@@ -443,7 +526,7 @@ export function PosSaleForm({
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5" />
                 <div>
-                  <p className="font-bold text-sm">Sale Saved!</p>
+                  <p className="font-bold text-sm">{isEdit ? 'Sale Updated!' : 'Sale Saved!'}</p>
                   <p className="text-xs text-emerald-100 font-mono">{saved.invoiceNo}</p>
                 </div>
               </div>
@@ -834,7 +917,7 @@ export function PosSaleForm({
             )}
             <button type="button" onClick={handleSave} disabled={!cart.length || isSubmitting}
               className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm py-2.5 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
-              {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Saving...</> : `Save Sale (${cart.length} item${cart.length !== 1 ? 's' : ''})`}
+              {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Saving...</> : isEdit ? 'Update Sale' : `Save Sale (${cart.length} item${cart.length !== 1 ? 's' : ''})`}
             </button>
             <button type="button" onClick={() => setMobileTab('items')}
               className="lg:hidden w-full text-center text-xs font-semibold text-slate-600 hover:text-slate-900 py-0.5">

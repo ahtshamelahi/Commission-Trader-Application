@@ -3,7 +3,7 @@
 // lib/actions/save-multi-sale-transaction.ts
 import { revalidatePath } from 'next/cache';
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
-import { performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
+import { performSaleCalculations_legacy as performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 

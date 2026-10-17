@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from '@/lib/supabase/supabase-server-client';
 import { NewSaleInput } from '@/types/sale-data-types';
 import { validateSaleInput } from '@/lib/validations/sale-form-validation';
-import { performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
+import { performSaleCalculations_legacy as performSaleCalculations } from '@/lib/calculations/sale-amount-calculation';
 import { calculateAvailableStock } from '@/lib/calculations/current-stock-calculation';
 
 export interface SaleExpenseInput {
@@ -101,18 +101,26 @@ export async function saveSaleTransaction(input: NewSaleWithExpensesInput) {
 
     const saleId = saleData.id;
 
-    // 2. Reduce Physical Stock (-physical_weight_kg)
-    const { error: stockError } = await supabase.from('stock_movements').insert({
-      crop_id: input.crop_id,
-      sale_id: saleId,
-      movement_type: 'sale',
-      quantity_kg: -input.physical_weight_kg,
-      notes: 'Physical delivery to buyer',
-    });
+     // 2. Reduce Physical Stock (-physical_weight_kg)
+     const { error: stockError } = await supabase.from('stock_movements').insert({
+       crop_id: input.crop_id,
+       sale_id: saleId,
+       movement_type: 'sale',
+       quantity_kg: -input.physical_weight_kg,
+       notes: 'Physical delivery to buyer',
+     });
 
-    if (stockError) {
-      console.error('Stock movement error during sale:', stockError.message);
-    }
+     if (stockError) {
+       console.error('Stock movement error during sale:', stockError.message);
+       return {
+         success: false,
+         saleId,
+         invoiceNo: saleData.invoice_no,
+         message:
+           `Sale ${saleData.invoice_no} was saved, but its stock movement failed. ` +
+           'Do not retry the sale; reconcile stock first.',
+       };
+     }
 
     // 3. Insert Sale Expenses
     if (validExpenses.length > 0) {

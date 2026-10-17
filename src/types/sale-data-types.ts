@@ -18,7 +18,10 @@ export interface Sale {
   sale_amount: number;
   vehicle_number: string | null;
   notes: string | null;
+  document_total?: number | null;
+  amount_received?: number | null;
   created_at: string;
+  updated_at?: string | null;
   crops?: Crop;
   parties?: Party;
 }

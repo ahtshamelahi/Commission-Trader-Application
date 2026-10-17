@@ -5,6 +5,12 @@ import { Sprout, Filter, AlertTriangle } from 'lucide-react';
 import { Crop, CropVariety } from '@/types/crop-data-types';
 import { Purchase } from '@/types/purchase-data-types';
 import { Sale } from '@/types/sale-data-types';
+import {
+  calculatePhysicalStockKg,
+  calculateWeightedAverageCostPerKg,
+  sumPurchasedGrossKg,
+  sumSoldPhysicalKg,
+} from '@/lib/calculations/current-stock-calculation';
 
 export interface VarietyStockSummary {
   id: string; // crop_id + variety_id
@@ -42,15 +48,15 @@ export function StockStatsCards({ crops, varieties, purchases, sales, isLoading 
       const vPurchases = purchases.filter((p) => p.crop_id === crop.id && p.variety_id === v.id);
       const vSales = sales.filter((s) => s.crop_id === crop.id && s.variety_id === v.id);
 
-      // Stock = gross weight purchased (commission is shop profit, full weight is in warehouse)
-      const totalPurchasedKg = vPurchases.reduce((acc, p) => acc + Number(p.gross_weight_kg), 0);
-      const totalSoldKg = vSales.reduce((acc, s) => acc + Number(s.physical_weight_kg), 0);
-      const currentStockKg = totalPurchasedKg - totalSoldKg;
+      const totalPurchasedKg = sumPurchasedGrossKg(vPurchases);
+      const totalSoldKg = sumSoldPhysicalKg(vSales);
+      const currentStockKg = calculatePhysicalStockKg({
+        purchasedGrossKg: totalPurchasedKg,
+        soldPhysicalKg: totalSoldKg,
+      });
 
-      if (totalPurchasedKg > 0 || totalSoldKg > 0 || currentStockKg > 0) {
-        let totalValue = 0;
-        for (const p of vPurchases) totalValue += Number(p.crop_amount);
-        const avgCostPerKg = totalPurchasedKg > 0 ? totalValue / totalPurchasedKg : 0;
+      if (totalPurchasedKg > 0 || totalSoldKg > 0 || currentStockKg !== 0) {
+        const avgCostPerKg = calculateWeightedAverageCostPerKg(vPurchases as Purchase[]);
 
         summaries.push({
           id: `${crop.id}-${v.id || 'none'}`,
@@ -58,9 +64,9 @@ export function StockStatsCards({ crops, varieties, purchases, sales, isLoading 
           variety_id: v.id,
           crop_name: crop.name,
           variety_name: v.name,
-          currentStockKg: Number(currentStockKg.toFixed(3)),
-          totalPurchasedKg: Number(totalPurchasedKg.toFixed(3)),
-          totalSoldKg: Number(totalSoldKg.toFixed(3)),
+          currentStockKg,
+          totalPurchasedKg,
+          totalSoldKg,
           avgCostPer40kg: Number((avgCostPerKg * 40).toFixed(2)),
         });
       }
